@@ -59,15 +59,15 @@ Goal: Replace the fake boundary with real Jira Cloud HTTP communication while ke
 
 The previous Phase 3 implemented Google Chat `/log` parsing before the product direction changed.
 
-[~] Remove `GoogleChatCommandParser`.
+[x] Remove `GoogleChatCommandParser`.
 
-[~] Remove `ParsedGoogleChatCommand`.
+[x] Remove `ParsedGoogleChatCommand`.
 
-[~] Remove `InvalidGoogleChatCommandException`.
+[x] Remove `InvalidGoogleChatCommandException`.
 
-[~] Remove `GoogleChatResponseBuilder`.
+[x] Remove `GoogleChatResponseBuilder`.
 
-[~] Remove their obsolete unit tests and configuration.
+[x] Remove their obsolete unit tests and configuration.
 
 Do not implement a Google Chat app, slash-command endpoint, Google request verification, or Google OAuth. Google Chat is now an outgoing notification only.
 
@@ -83,35 +83,35 @@ Goal: Replace command-based input with a small authenticated Vue UI that uses th
 
 [x] Update `AGENTS.md`, `ARCHITECTURE.md`, `DESIGN.md`, and `TASKS.md` for the new direction.
 
-[ ] Remove the superseded Google Chat command parser, response builder, related DTO/exception, tests, and unused configuration.
+[x] Remove the superseded Google Chat command parser, response builder, related DTO/exception, tests, and unused configuration.
 
 ## Vue and Vite
 
-[ ] Add Vue 3 and the Vue Vite plugin using the existing Laravel Vite setup.
+[x] Add Vue 3 and the Vue Vite plugin using the existing Laravel Vite setup.
 
-[ ] Create the Blade entry point and mount one Vue application.
+[x] Create the Blade entry point and mount one Vue application.
 
 [ ] Create focused login and worklog form components.
 
-[ ] Do not add Vue Router, Pinia, or a UI framework.
+[x] Do not add Vue Router, Pinia, or a UI framework.
 
-[ ] Add responsive styling for mobile and desktop.
+[x] Add responsive styling for mobile and desktop.
 
 ## Worklog Form
 
-[ ] Implement required ticket and duration inputs.
+[x] Implement required ticket and duration inputs.
 
-[ ] Implement date and time inputs defaulted in the configured application timezone.
+[x] Implement date and time inputs defaulted in the configured application timezone.
 
-[ ] Normalize ticket input to uppercase without duplicating authoritative server validation.
+[x] Normalize ticket input to uppercase without duplicating authoritative server validation.
 
-[ ] Submit to the existing `POST /api/worklogs` endpoint.
+[x] Submit to the existing `POST /api/worklogs` endpoint.
 
-[ ] Implement loading state and duplicate-submit prevention.
+[x] Implement loading state and duplicate-submit prevention.
 
-[ ] Implement field validation, Jira error, success, notification-warning, and session-expired states.
+[x] Implement field validation, Jira error, success, notification-warning, and session-expired states.
 
-[ ] Preserve form values after a failed submission.
+[x] Preserve form values after a failed submission.
 
 ## Personal Session Authentication
 
@@ -133,13 +133,13 @@ Goal: Replace command-based input with a small authenticated Vue UI that uses th
 
 [ ] Add feature tests for guest rejection, successful login, invalid password, logout, rate limiting, and authenticated worklog submission.
 
-[ ] Verify relevant accessibility behavior and responsive layout.
+[x] Verify relevant accessibility behavior and responsive layout.
 
-[ ] Run the Vite production build.
+[x] Run the Vite production build.
 
-[ ] Run formatting and the complete PHP test suite.
+[x] Run formatting and the complete PHP test suite.
 
-[ ] Stop after Phase 3 unless explicitly instructed to continue.
+[x] Stop after Phase 3 unless explicitly instructed to continue.
 
 ---
 
