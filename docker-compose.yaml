@@ -1,0 +1,19 @@
+services:
+  jira-worklog-bot-local:
+    container_name: jira-worklog-bot-local
+    image: jira-worklog-bot:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.docker
+    environment:
+      APP_KEY_AUTO_GENERATE: "true"
+      APP_KEY_FILE: /data/app-key
+    volumes:
+      - jira-worklog-bot-data:/data
+
+volumes:
+  jira-worklog-bot-data:

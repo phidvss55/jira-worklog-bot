@@ -173,19 +173,21 @@ Goal: Notify a Google Chat space after Jira successfully creates a worklog.
 
 Goal: Produce a minimal reproducible image that serves Laravel and compiled Vue assets.
 
-[ ] Add a production-ready `Dockerfile`.
+[x] Add a production-ready `Dockerfile`.
 
-[ ] Add `.dockerignore`.
+[x] Add `.dockerignore`.
 
-[ ] Install PHP and JavaScript dependencies reproducibly.
+[x] Install PHP and JavaScript dependencies reproducibly.
 
-[ ] Compile Vite assets during the image build without embedding runtime secrets.
+[x] Compile Vite assets during the image build without embedding runtime secrets.
+
+[x] Publish `phidinh/jira-worklog-bot:latest` and an immutable commit SHA tag on every push to `main` through GitHub Actions.
 
 [ ] Build and run the container locally.
 
 [ ] Verify `GET /health`, login, the Vue page, and authenticated `POST /api/worklogs`.
 
-[ ] Run automated tests before deployment.
+[x] Run automated tests before deployment.
 
 ---
 
