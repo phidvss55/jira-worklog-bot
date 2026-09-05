@@ -7,6 +7,7 @@ return [
         'email' => env('JIRA_EMAIL'),
         'api_token' => env('JIRA_API_TOKEN'),
         'timeout' => 10,
+        'google_chat_webhook_url' => env('GOOGLE_CHAT_WEBHOOK_URL'),
     ],
 
     /*

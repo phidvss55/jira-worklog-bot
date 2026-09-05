@@ -6,378 +6,184 @@
 [ ] Not started
 [x] Completed
 [-] In progress
+[~] Superseded; remove during the indicated phase
 ```
 
 ---
 
 # Phase 1 — Laravel Core
 
-Goal:
+Goal: Build and test the core Laravel worklog flow without real Jira credentials.
 
-Build and test the core Laravel worklog flow without Google Chat or real Jira credentials.
+[x] Create the Laravel 12+ project.
 
-## Bootstrap
+[x] Configure `Asia/Ho_Chi_Minh` as the application timezone.
 
-[x] Create Laravel 12+ project.
+[x] Add the `GET /health` endpoint.
 
-[x] Configure application timezone using:
+[x] Implement and test `DurationParser`.
 
-```text
-Asia/Ho_Chi_Minh
-```
+[x] Implement and test `WorklogDateParser`.
 
-[x] Add `/health` endpoint.
+[x] Implement `LogWorkCommand` and `LogWorkHandler`.
 
-Expected:
+[x] Implement `POST /api/worklogs` with request validation and ticket normalization.
 
-```text
-GET /health
-```
-
-returns HTTP `200`.
-
-[x] Ensure `.env.example` contains required non-secret configuration.
-
----
-
-## Duration Parser
-
-[x] Implement:
-
-```text
-app/Support/DurationParser.php
-```
-
-Support:
-
-```text
-15m
-30m
-1h
-2h
-1h30m
-2h15m
-8h
-```
-
-Return duration in seconds.
-
-Examples:
-
-```text
-15m    → 900
-1h     → 3600
-1h30m  → 5400
-2h15m  → 8100
-```
-
-Reject invalid values such as:
-
-```text
-abc
-2hours
--1h
-0h
-```
-
-[x] Add unit tests.
-
----
-
-## Worklog Date Parser
-
-[x] Implement:
-
-```text
-app/Support/WorklogDateParser.php
-```
-
-Support:
-
-```text
-no date/time
-time only
-date + time
-```
-
-Examples:
-
-```text
-null + null
-→ now
-
-null + 14:30
-→ today 14:30
-
-04/09/2026 + 14:30
-→ 2026-09-04 14:30
-```
-
-Use configured timezone.
-
-Do not depend on server timezone.
-
-[x] Add unit tests.
-
----
-
-## Worklog Application Use Case
-
-[x] Implement:
-
-```text
-app/Application/Worklog/LogWorkCommand.php
-```
-
-Command should contain the normalized values needed by the worklog use case.
-
-[x] Implement:
-
-```text
-app/Application/Worklog/LogWorkHandler.php
-```
-
-Responsibilities:
-
-```text
-receive worklog command
-    ↓
-normalize/coordinate worklog data
-    ↓
-call JiraClient
-    ↓
-return result
-```
-
-Keep HTTP-specific behavior outside the handler.
-
----
-
-## Manual Worklog API
-
-[x] Implement:
-
-```text
-POST /api/worklogs
-```
-
-[x] Create:
-
-```text
-StoreWorklogRequest
-WorklogController
-```
-
-Example request:
-
-```json
-{
-  "ticket": "BKM4-1234",
-  "duration": "2h15m",
-  "date": "05/09/2026",
-  "time": "14:30"
-}
-```
-
-Validation:
-
-```text
-ticket   required
-duration required
-date     optional
-time     optional
-```
-
-[x] Normalize Jira ticket key to uppercase.
-
----
-
-## Mock Jira Client
-
-[x] Create initial Jira client abstraction/service.
-
-The first implementation must not require real Jira credentials.
-
-It should allow the complete application flow to be tested.
-
-Do not call real Jira during Phase 1.
-
-[x] Add Feature tests for:
-
-```text
-valid request
-invalid ticket format
-invalid duration
-invalid date
-invalid time
-```
+[x] Create a fake Jira implementation and feature-test the complete core flow.
 
 ---
 
 # Phase 2 — Jira Cloud Integration
 
-Do not begin this phase until Phase 1 tests pass.
+Goal: Replace the fake boundary with real Jira Cloud HTTP communication while keeping automated tests isolated.
 
-[ ] Create Jira API token manually.
+[ ] Create a Jira API token manually.
 
-[x] Configure:
-
-```text
-JIRA_BASE_URL
-JIRA_EMAIL
-JIRA_API_TOKEN
-```
+[x] Configure `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` through Laravel configuration.
 
 [x] Update `.env.example` without real credentials.
 
-[x] Implement real Jira HTTP communication in:
+[x] Implement Jira worklog creation through the dedicated Jira client.
 
-```text
-JiraClient
-```
+[x] Send issue key, `timeSpentSeconds`, and `started`.
 
-[x] Implement worklog creation using Jira Cloud REST API.
+[x] Safely handle success, not found, unauthorized, forbidden, validation, network, and timeout responses.
 
-[x] Send:
-
-```text
-issue key
-timeSpentSeconds
-started
-```
-
-[x] Handle:
-
-```text
-success
-ticket not found
-unauthorized
-forbidden
-validation failure
-network failure
-timeout
-```
-
-[x] Ensure sensitive Jira data is never exposed in application responses.
-
-[x] Add mocked HTTP tests.
+[x] Add mocked Jira HTTP tests and verify secrets are not exposed.
 
 [ ] Manually test against one real Jira issue.
 
 ---
 
-# Phase 3 — Google Chat Command Parser
+# Superseded Direction — Google Chat Command Input
 
-Do not configure Google Chat yet.
+The previous Phase 3 implemented Google Chat `/log` parsing before the product direction changed.
 
-First implement and test command parsing independently.
+[~] Remove `GoogleChatCommandParser`.
 
-[ ] Implement:
+[~] Remove `ParsedGoogleChatCommand`.
 
-```text
-GoogleChatCommandParser
-```
+[~] Remove `InvalidGoogleChatCommandException`.
 
-Support:
+[~] Remove `GoogleChatResponseBuilder`.
 
-```text
-/log BKM4-1234 2h15m
+[~] Remove their obsolete unit tests and configuration.
 
-/log BKM4-1234 2h15m 14:30
-
-/log BKM4-1234 2h15m 04/09/2026 14:30
-```
-
-[ ] Normalize parsed data into the same worklog application input used by the manual API.
-
-[ ] Add parser unit tests.
-
-[ ] Implement Google Chat response builder.
+Do not implement a Google Chat app, slash-command endpoint, Google request verification, or Google OAuth. Google Chat is now an outgoing notification only.
 
 ---
 
-# Phase 4 — Google Chat Integration
+# Phase 3 — Vue UI and Personal Access
 
-Do not begin until Jira integration works.
+Current target.
 
-[ ] Create/configure Google Cloud project.
+Goal: Replace command-based input with a small authenticated Vue UI that uses the existing worklog API and application flow.
 
-[ ] Enable Google Chat API.
+## Documentation and Cleanup
 
-[ ] Configure Google Chat App.
+[x] Update `AGENTS.md`, `ARCHITECTURE.md`, `DESIGN.md`, and `TASKS.md` for the new direction.
 
-[ ] Configure HTTP interaction endpoint.
+[ ] Remove the superseded Google Chat command parser, response builder, related DTO/exception, tests, and unused configuration.
 
-[ ] Implement:
+## Vue and Vite
 
-```text
-POST /api/google-chat
-```
+[ ] Add Vue 3 and the Vue Vite plugin using the existing Laravel Vite setup.
 
-[ ] Implement Google Chat request verification.
+[ ] Create the Blade entry point and mount one Vue application.
 
-[ ] Restrict requests to configured single Google user.
+[ ] Create focused login and worklog form components.
 
-[ ] Configure:
+[ ] Do not add Vue Router, Pinia, or a UI framework.
 
-```text
-GOOGLE_ALLOWED_USER
-GOOGLE_CHAT_AUDIENCE
-```
+[ ] Add responsive styling for mobile and desktop.
 
-[ ] Connect command parsing to:
+## Worklog Form
 
-```text
-LogWorkHandler
-```
+[ ] Implement required ticket and duration inputs.
 
-Expected flow:
+[ ] Implement date and time inputs defaulted in the configured application timezone.
 
-```text
-Google Chat
-    ↓
-GoogleChatController
-    ↓
-GoogleChatCommandParser
-    ↓
-LogWorkHandler
-    ↓
-JiraClient
-    ↓
-GoogleChatResponseBuilder
-```
+[ ] Normalize ticket input to uppercase without duplicating authoritative server validation.
 
-[ ] Test valid command.
+[ ] Submit to the existing `POST /api/worklogs` endpoint.
 
-[ ] Test invalid command.
+[ ] Implement loading state and duplicate-submit prevention.
 
-[ ] Test unauthorized user.
+[ ] Implement field validation, Jira error, success, notification-warning, and session-expired states.
 
-[ ] Test invalid Google request.
+[ ] Preserve form values after a failed submission.
+
+## Personal Session Authentication
+
+[ ] Add a server-configured `APP_ACCESS_PASSWORD_HASH` placeholder to `.env.example`.
+
+[ ] Implement a minimal login endpoint and screen using the configured password hash.
+
+[ ] Regenerate the Laravel session after successful login and logout.
+
+[ ] Protect both the application page and `POST /api/worklogs` with session authentication.
+
+[ ] Use Laravel CSRF protection for state-changing browser requests.
+
+[ ] Rate-limit failed login attempts.
+
+[ ] Do not add a users table, registration, password recovery, OAuth, Google login, or Sanctum.
+
+## Verification
+
+[ ] Add feature tests for guest rejection, successful login, invalid password, logout, rate limiting, and authenticated worklog submission.
+
+[ ] Verify relevant accessibility behavior and responsive layout.
+
+[ ] Run the Vite production build.
+
+[ ] Run formatting and the complete PHP test suite.
+
+[ ] Stop after Phase 3 unless explicitly instructed to continue.
+
+---
+
+# Phase 4 — Google Chat Notification
+
+Goal: Notify a Google Chat space after Jira successfully creates a worklog.
+
+[ ] Add `GOOGLE_CHAT_WEBHOOK_URL` to `.env.example` without a real URL.
+
+[ ] Map the environment variable through `config/services.php`.
+
+[ ] Implement `GoogleChatNotifier` using Laravel HTTP Client.
+
+[ ] Send a concise message containing ticket, human-readable duration, and started date/time.
+
+[ ] Invoke the notifier only after Jira succeeds.
+
+[ ] Return `notificationSent: true` after successful delivery.
+
+[ ] On missing configuration or delivery failure, log a safe warning and return `notificationSent: false` while keeping the worklog response successful.
+
+[ ] Never retry by creating another Jira worklog.
+
+[ ] Add mocked HTTP tests for notification success, missing configuration, timeout, rejection, and safe logging.
+
+[ ] Test explicitly that Jira failure does not notify and notification failure does not change Jira success.
 
 ---
 
 # Phase 5 — Docker
 
-[ ] Add production-ready `Dockerfile`.
+Goal: Produce a minimal reproducible image that serves Laravel and compiled Vue assets.
+
+[ ] Add a production-ready `Dockerfile`.
 
 [ ] Add `.dockerignore`.
 
-[ ] Build locally.
+[ ] Install PHP and JavaScript dependencies reproducibly.
 
-[ ] Run container locally.
+[ ] Compile Vite assets during the image build without embedding runtime secrets.
 
-[ ] Verify:
+[ ] Build and run the container locally.
 
-```text
-GET /health
-```
-
-[ ] Verify:
-
-```text
-POST /api/worklogs
-```
+[ ] Verify `GET /health`, login, the Vue page, and authenticated `POST /api/worklogs`.
 
 [ ] Run automated tests before deployment.
 
@@ -385,78 +191,47 @@ POST /api/worklogs
 
 # Phase 6 — Render
 
-[ ] Create Render Web Service.
+Goal: Deploy the protected application and configure external integrations.
 
-[ ] Connect GitHub repository.
+[ ] Create a Render Web Service and connect the GitHub repository.
 
 [ ] Configure Docker deployment.
 
-[ ] Configure environment variables.
+[ ] Configure `APP_KEY`, secure production session settings, `APP_ACCESS_PASSWORD_HASH`, Jira credentials, and `GOOGLE_CHAT_WEBHOOK_URL` as Render secrets.
 
-[ ] Deploy.
+[ ] Deploy and verify the public health endpoint.
 
-[ ] Verify public `/health`.
+[ ] Verify unauthenticated users cannot access the UI or worklog API.
+
+[ ] Verify login and the Vue production build.
 
 [ ] Verify Jira integration from Render.
 
-[ ] Configure Render URL as Google Chat endpoint.
-
-[ ] Perform end-to-end test:
-
-```text
-Google Chat
-    ↓
-Render
-    ↓
-Laravel
-    ↓
-Jira
-```
+[ ] Verify Google Chat incoming-webhook delivery from Render.
 
 ---
 
-# Phase 7 — Final Verification
+# Phase 7 — End-to-End Verification
 
-[ ] Verify:
+[ ] Verify normal daily usage with ticket and duration only.
 
-```text
-/log BKM4-1234 30m
-```
+[ ] Verify explicit date and time input.
 
-[ ] Verify:
+[ ] Verify ticket normalization.
 
-```text
-/log BKM4-1234 2h15m
-```
+[ ] Verify invalid ticket, duration, date, and time behavior.
 
-[ ] Verify:
+[ ] Verify login rejection, rate limiting, logout, session expiry, and protected API behavior.
 
-```text
-/log BKM4-1234 2h15m 14:30
-```
+[ ] Verify Jira success with Google Chat notification success.
 
-[ ] Verify:
+[ ] Verify Jira success remains successful when Google Chat notification fails.
 
-```text
-/log BKM4-1234 2h15m 04/09/2026 14:30
-```
+[ ] Verify Jira failure does not send a Google Chat notification.
 
-[ ] Verify invalid ticket behavior.
+[ ] Verify repeated clicks cannot accidentally create duplicate worklogs.
 
-[ ] Verify invalid duration behavior.
-
-[ ] Verify invalid date/time behavior.
-
-[ ] Verify unauthorized Google user cannot use the bot.
-
-[ ] Verify Jira credentials are not present in:
-
-```text
-repository
-logs
-responses
-Docker image configuration committed to Git
-```
+[ ] Verify credentials and secrets are absent from the repository, browser bundle, logs, responses, and committed Docker configuration.
 
 ---
 
@@ -465,18 +240,19 @@ Docker image configuration committed to Git
 The agent must not implement the following unless explicitly requested:
 
 ```text
-database
+database persistence
 Redis
 queues
 multi-user support
+registration or password recovery
 Jira OAuth
-frontend
-dashboard
-worklog history
-Google login UI
-undo worklog
-worklog editing
-worklog deletion
+Google Chat app or slash commands
+Google OAuth
+Vue Router
+Pinia
+UI framework
+dashboard or worklog history
+worklog editing, deletion, or undo
 comments/descriptions
 ```
 
@@ -487,25 +263,23 @@ comments/descriptions
 Current target:
 
 ```text
-Phase 1 — Laravel Core
+Phase 3 — Vue UI and Personal Access
 ```
 
-Stop after Phase 1 unless explicitly instructed to continue.
-
-Phase 1 is complete when:
+Phase 3 is complete when:
 
 ```text
-Laravel runs locally
+obsolete Google Chat input code is removed
         +
-/health works
+the authenticated Vue UI works on mobile and desktop
         +
-duration parsing works
+POST /api/worklogs is protected and used by the UI
         +
-date/time parsing works
+loading, validation, success, and error states work
         +
-POST /api/worklogs works
+the Vite production build passes
         +
-Jira is mocked
-        +
-tests pass
+the complete PHP test suite passes
 ```
+
+Do not begin Google Chat notification, Docker, or Render work until Phase 3 is complete and the user explicitly requests the next phase.

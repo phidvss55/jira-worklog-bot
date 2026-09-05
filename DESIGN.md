@@ -2,32 +2,98 @@
 
 ## 1. Product Goal
 
-Provide the fastest possible way for a single user to log working time into Jira from Google Chat.
+Provide a fast, secure web interface for one user to log working time into Jira and receive a confirmation in Google Chat.
 
 The primary design goal is:
 
-> Logging work should require one short command and no additional UI interaction.
+> A normal daily worklog should require only a ticket, a duration, and one submit action.
 
-## 2. Primary Command
-
-```text
-/log <ticket> <duration> [time]
-/log <ticket> <duration> [date] [time]
-```
-
-Examples:
+## 2. Primary Experience
 
 ```text
-/log BKM4-1234 2h15m
-/log BKM4-1234 2h15m 14:30
-/log BKM4-1234 2h15m 04/09/2026 14:30
+Open application
+    ↓
+Sign in when the session is absent
+    ↓
+Enter ticket and duration
+    ↓
+Optionally adjust date and time
+    ↓
+Select Log Work
+    ↓
+Jira worklog created
+    ↓
+UI confirmation + Google Chat notification attempt
 ```
 
-## 3. Ticket Format
+The MVP is a small Laravel + Vue application, not a dashboard. It does not require Vue Router, Pinia, or a UI component framework.
 
-Ticket identifiers should follow normal Jira issue-key format.
+## 3. Authentication Experience
 
-Examples:
+When no authenticated session exists, show a minimal password screen.
+
+```text
+┌─────────────────────────────────────┐
+│ Jira Worklog                        │
+│                                     │
+│ Personal password                   │
+│ ┌─────────────────────────────────┐ │
+│ │ ••••••••••••                    │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│              [ Sign in ]            │
+└─────────────────────────────────────┘
+```
+
+Requirements:
+
+- do not reveal whether configuration or password details are wrong
+- disable the submit button and show progress while signing in
+- show a concise error for rejected or rate-limited attempts
+- never store the plaintext password in local storage
+- provide a simple logout action after authentication
+
+No registration, password reset, profile, account management, or Google login is needed.
+
+## 4. Worklog Form
+
+The authenticated page contains one primary form.
+
+```text
+┌─────────────────────────────────────────┐
+│ Jira Worklog                    Log out │
+│ Log your working time to Jira          │
+│                                         │
+│ Jira Ticket                             │
+│ ┌─────────────────────────────────────┐ │
+│ │ BKM4-1234                           │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ Duration                                │
+│ ┌─────────────────────────────────────┐ │
+│ │ 2h15m                               │ │
+│ └─────────────────────────────────────┘ │
+│ Examples: 30m, 1h, 1h30m, 2h15m       │
+│                                         │
+│ Date                     Start time     │
+│ ┌───────────────────┐   ┌─────────────┐ │
+│ │ 05/09/2026        │   │ 14:30       │ │
+│ └───────────────────┘   └─────────────┘ │
+│                                         │
+│              [ Log Work ]               │
+│                                         │
+│ ✓ Worklog added                         │
+│   BKM4-1234 · 2h 15m · 14:30            │
+└─────────────────────────────────────────┘
+```
+
+The layout must remain usable on mobile and desktop. On narrow screens, date and time may stack vertically.
+
+## 5. Field Behavior
+
+### Jira Ticket
+
+Required. Accept normal Jira issue-key format such as:
 
 ```text
 BKM4-1234
@@ -35,188 +101,101 @@ ABC-10
 OPS-999
 ```
 
-Ticket input should be normalized to uppercase where appropriate.
+Normalize lowercase input to uppercase. Jira remains responsible for determining whether the ticket exists and is accessible.
 
-Example:
+### Duration
 
-```text
-bkm4-1234
-```
-
-becomes:
-
-```text
-BKM4-1234
-```
-
-Jira remains responsible for determining whether the ticket actually exists.
-
-## 4. Duration
-
-Supported:
+Required. Supported examples:
 
 ```text
 15m
 30m
 45m
-
 1h
 2h
 8h
-
 1h15m
 1h30m
 2h15m
 7h30m
 ```
 
-Whitespace inside duration is not supported.
+Whitespace inside a duration is not supported. Duration must be greater than zero.
 
-Valid:
+### Date and Time
 
-```text
-2h15m
-```
+Default date to today and time to the current time in the configured application timezone. The user may adjust either value before submitting.
 
-Invalid:
+All values are interpreted in `Asia/Ho_Chi_Minh` unless application configuration overrides it. Browser display must not change the server-side interpretation.
 
-```text
-2h 15m
-```
+Client-side validation may give immediate feedback, but Laravel validation and parsers are authoritative.
 
-Duration must be greater than zero.
+## 6. Submission Behavior
 
-## 5. Started Time
+On submit:
 
-### Default
+1. Prevent duplicate submissions.
+2. Disable the primary action and show a clear loading label.
+3. Send the form to `POST /api/worklogs` using the authenticated session and CSRF protection.
+4. Display server validation beside the relevant field where possible.
+5. Preserve the entered values after a failure so they can be corrected.
+6. Display success only after Jira confirms creation.
 
-Command:
+The MVP does not require a confirmation dialog before a valid submission.
 
-```text
-/log BKM4-1234 2h15m
-```
+## 7. Success States
 
-means:
-
-```text
-started = current date/time
-```
-
-### Explicit Time
+### Jira and Notification Succeeded
 
 ```text
-/log BKM4-1234 2h15m 14:30
+✓ Worklog added
+BKM4-1234 · 2h 15m · 05/09/2026 14:30
+Google Chat notified.
 ```
 
-means:
+### Jira Succeeded but Notification Failed
 
 ```text
-started = today at 14:30
+✓ Worklog added
+BKM4-1234 · 2h 15m · 05/09/2026 14:30
+Google Chat notification could not be sent.
 ```
 
-### Explicit Date and Time
+The second state is still a success. It must not invite the user to submit the worklog again because doing so could create a duplicate Jira worklog.
+
+## 8. Failure States
+
+### Invalid Input
+
+Use concise field-level messages, for example:
 
 ```text
-/log BKM4-1234 2h15m 04/09/2026 14:30
+Enter a ticket such as BKM4-1234.
+Enter a duration such as 30m, 1h, or 2h15m.
+Enter a valid date.
+Enter a valid time.
 ```
 
-means:
+### Jira Rejection
 
 ```text
-started = 04/09/2026 14:30
+Unable to log work
+BKM4-1234 was not found, is not accessible, or Jira rejected the worklog.
 ```
 
-All values are interpreted in:
+Use a more specific reason only when Jira provides one that is safe and useful. Never expose credentials, authorization headers, raw webhook URLs, or internal stack traces.
 
-```text
-Asia/Ho_Chi_Minh
-```
+### Session Expired
 
-unless application configuration overrides the timezone.
+Return the user to the password screen with a concise message. Preserve worklog input in memory when practical, but do not store sensitive authentication data.
 
-## 6. Google Chat Success Response
-
-Example command:
-
-```text
-/log BKM4-1234 2h15m 14:30
-```
-
-Expected response:
-
-```text
-✅ Worklog added
-
-BKM4-1234
-Time: 2h 15m
-Started: 05/09/2026 14:30
-```
-
-Keep the response concise.
-
-## 7. Invalid Command
-
-Example:
-
-```text
-/log BKM4-1234 abc
-```
-
-Response:
-
-```text
-❌ Invalid duration: "abc"
-
-Examples:
-30m
-1h
-1h30m
-2h15m
-```
-
-Do not display long technical explanations.
-
-## 8. Invalid Ticket
-
-Example:
-
-```text
-/log BKM4-999999 2h
-```
-
-Response:
-
-```text
-❌ Unable to log work
-
-BKM4-999999
-Ticket was not found or is not accessible.
-```
-
-## 9. Jira Rejection
-
-When Jira rejects a worklog:
-
-```text
-❌ Unable to log work
-
-BKM4-1234
-Jira rejected the worklog.
-```
-
-If Jira provides a safe and useful validation reason, the application may display it.
-
-Never expose internal credentials, HTTP authorization headers, or sensitive debugging data.
-
-## 10. Manual Development API
-
-Before Google Chat integration is implemented, the application exposes:
-
-```text
-POST /api/worklogs
-```
+## 9. API Contract
 
 Request:
+
+```http
+POST /api/worklogs
+```
 
 ```json
 {
@@ -227,9 +206,7 @@ Request:
 }
 ```
 
-`date` and `time` are optional.
-
-Response during the mock phase:
+Successful response:
 
 ```json
 {
@@ -239,63 +216,78 @@ Response during the mock phase:
     "duration": "2h15m",
     "durationSeconds": 8100,
     "started": "2026-09-05T14:30:00+07:00"
-  }
+  },
+  "notificationSent": true
 }
 ```
 
-Once real Jira integration exists, the endpoint should execute the same application use case used by Google Chat.
+If Jira succeeds and the notification fails, return the same successful worklog data with `notificationSent: false`.
 
-## 11. Product Constraints
+The API must reject unauthenticated requests. It must never expose Jira credentials, the personal password hash, or the Google Chat webhook URL.
 
-The product is designed for one user.
+## 10. Google Chat Notification
 
-Therefore the MVP intentionally avoids:
-
-- registration
-- login UI
-- user profiles
-- Jira account selection
-- organization management
-- dashboards
-- worklog history storage
-
-## 12. Future Enhancements
-
-Possible future commands may include:
+After Jira succeeds, send a concise incoming-webhook message:
 
 ```text
-/log BKM4-1234 2h yesterday
-/log BKM4-1234 2h "Fix validation bug"
-/worklogs today
-/undo
+✅ Jira Worklog Added
+
+🎫 BKM4-1234
+⏱ 2h 15m
+🕐 05/09/2026 14:30
 ```
 
-These are not part of the current scope.
+Google Chat is notification-only. The product no longer supports entering `/log` commands in Google Chat.
 
-Do not implement them unless explicitly added to `TASKS.md`.
+## 11. Accessibility and Usability
+
+- every input has a visible label
+- keyboard submission and logical focus order work
+- loading and result messages are understandable without relying only on color
+- validation errors are associated with their fields
+- primary controls have usable touch targets
+- the page remains readable at common mobile widths
+
+## 12. Product Constraints
+
+The MVP intentionally avoids:
+
+- multi-user accounts
+- registration and password recovery
+- database-backed profiles or sessions
+- Jira account selection
+- worklog history storage
+- a general dashboard
+- Vue Router, Pinia, and UI frameworks
+- Google Chat slash commands or an interactive Chat app
+- Google OAuth
+- worklog editing, deletion, and undo
+- comments/descriptions
 
 ## 13. Design Principle
 
 Optimize for:
 
 ```text
-minimum typing
+minimum input
 +
 predictable behavior
 +
 clear confirmation
++
+no accidental duplicate worklogs
 ```
 
-The normal workflow should remain:
+The normal daily workflow should remain:
 
 ```text
-type command
-    ↓
-press Enter
-    ↓
-worklog created
-    ↓
-confirmation
+ticket + duration
+        ↓
+select Log Work
+        ↓
+Jira worklog created
+        ↓
+UI confirmation
+        ↓
+best-effort Google Chat notification
 ```
-
-No additional confirmation step should be required for a valid command in the MVP.

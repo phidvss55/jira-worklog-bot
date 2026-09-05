@@ -2,55 +2,52 @@
 
 ## 1. Overview
 
-Jira Worklog Bot is a personal integration service for logging work from Google Chat into Jira Cloud.
+Jira Worklog Bot is a personal web application for logging work to Jira Cloud.
 
-The target interaction is:
+A single user signs in with a personal password, submits a small Vue form, and Laravel creates the Jira worklog. After Jira succeeds, Laravel attempts to send a best-effort notification to a Google Chat space through an incoming webhook.
 
-```text
-/log BKM4-1234 2h15m
-```
-
-The application is intentionally designed for one user.
+The application remains intentionally small and single-user.
 
 ## 2. System Context
 
 ```text
-┌──────────────────────┐
-│     Google Chat      │
-│                      │
-│ /log BKM4-1234 2h15m │
-└──────────┬───────────┘
-           │
-           │ HTTPS interaction event
-           ▼
-┌──────────────────────┐
-│       Laravel        │
-│                      │
-│   Render / Docker    │
-└──────────┬───────────┘
-           │
-           │ Jira REST API
-           ▼
-┌──────────────────────┐
-│      Jira Cloud      │
-│                      │
-│      Worklogs        │
-└──────────────────────┘
+┌────────────────────────────┐
+│          Browser           │
+│      Vue + Vite UI         │
+└─────────────┬──────────────┘
+              │ authenticated session / HTTPS
+              ▼
+┌────────────────────────────┐
+│          Laravel           │
+│      Render / Docker       │
+└─────────────┬──────────────┘
+              │ Jira REST API
+              ▼
+┌────────────────────────────┐
+│         Jira Cloud         │
+│          Worklogs          │
+└─────────────┬──────────────┘
+              │ success
+              ▼
+┌────────────────────────────┐
+│ Google Chat Incoming Hook  │
+│   best-effort notification │
+└────────────────────────────┘
 ```
 
-Laravel is the trusted backend between Google Chat and Jira.
+Laravel is the trusted boundary. Jira and Google Chat credentials never reach the browser.
 
 ## 3. Architectural Goals
 
 The architecture should be:
 
 - simple
-- stateless
+- secure for a publicly deployed single-user tool
 - easy to test
 - inexpensive to host
 - easy to understand
 - isolated from external integrations
-- suitable for a single user
+- independent of application database state
 
 This application does not require enterprise architecture.
 
@@ -60,99 +57,84 @@ Target deployment:
 
 ```text
 Developer
-    │
     │ git push
     ▼
 GitHub
     │
     ▼
 Render
-    │
     │ build Dockerfile
+    │ install PHP/JS dependencies
+    │ compile Vite assets
     ▼
 Laravel Container
 ```
 
-Target hosting is Render Free Web Service during development/personal usage.
+Target hosting is a Render Web Service for development and personal usage.
 
-The application should not depend on persistent local filesystem state.
+The application must not depend on persistent local filesystem state. Environment variables provide deployment-specific configuration and secrets.
 
 ## 5. Layers
 
 Use three conceptual layers.
 
-### HTTP / Integration Layer
+### Presentation / HTTP Layer
 
 Responsibilities:
 
-- receive HTTP requests
-- validate request shape
-- authenticate external requests
-- translate external protocols into application commands
-- format responses
+- render the Blade/Vue entry point
+- present the login and worklog forms
+- validate HTTP request shape
+- enforce session authentication and CSRF protection
+- translate requests into application commands
+- format safe JSON responses
 
 Examples:
 
 ```text
+Vue components
+Authentication controller/middleware
+StoreWorklogRequest
 WorklogController
-GoogleChatController
-VerifyGoogleChatRequest
-GoogleChatCommandParser
 ```
 
-This layer must not contain Jira HTTP implementation details.
+This layer must not contain Jira or Google Chat HTTP implementation details.
 
 ### Application Layer
 
-Coordinates the use case.
-
-Primary use case:
+Coordinates the `LogWork` use case.
 
 ```text
-LogWork
-```
-
-Components:
-
-```text
-LogWorkCommand
-LogWorkHandler
-```
-
-Example flow:
-
-```text
-Controller
+WorklogController
     ↓
 LogWorkCommand
     ↓
 LogWorkHandler
-    ↓
-JiraClient
+    ├── JiraClient
+    └── GoogleChatNotifier after Jira success
 ```
 
-The application layer should not know whether the request originated from Google Chat or the manual API.
+The handler owns operation ordering and the distinction between the primary Jira operation and secondary notification.
 
 ### Integration / Service Layer
 
 Handles external systems and reusable parsing utilities.
 
-Examples:
-
 ```text
 JiraClient
+GoogleChatNotifier
 DurationParser
 WorklogDateParser
 ```
 
-Jira-specific HTTP calls belong only in the Jira integration.
+Jira-specific HTTP calls belong only in the Jira integration. Google Chat webhook payload and delivery logic belong only in the Google Chat notifier.
 
 ## 6. Application Flow
 
-The canonical use case is:
+The canonical flow is:
 
 ```text
-Input
+Authenticated Vue form
   │
   ├── ticket
   ├── duration
@@ -160,17 +142,14 @@ Input
   └── optional time
   │
   ▼
-Validate
+POST /api/worklogs
   │
   ▼
-Parse Duration
+Server-side validation
   │
-  └── 2h15m → 8100 seconds
-  │
-  ▼
-Parse Started Time
-  │
-  └── Asia/Ho_Chi_Minh
+  ├── normalize ticket
+  ├── parse duration to seconds
+  └── parse started time in configured timezone
   │
   ▼
 LogWorkCommand
@@ -181,9 +160,21 @@ LogWorkHandler
   ▼
 JiraClient
   │
-  ▼
-Jira Cloud
+  ├── failure ──> safe error response
+  │
+  └── success
+        │
+        ▼
+  GoogleChatNotifier
+        │
+        ├── success ──> notificationSent = true
+        └── failure ──> log warning, notificationSent = false
+                         │
+                         ▼
+                    successful UI response
 ```
+
+The application must never create a second Jira worklog merely to retry a failed notification.
 
 ## 7. Project Structure
 
@@ -195,34 +186,40 @@ app/
 │   └── Worklog/
 │       ├── LogWorkCommand.php
 │       └── LogWorkHandler.php
-│
 ├── Http/
 │   ├── Controllers/
-│   │   ├── WorklogController.php
-│   │   └── GoogleChatController.php
-│   │
+│   │   ├── AuthenticationController.php
+│   │   └── WorklogController.php
 │   ├── Middleware/
-│   │   └── VerifyGoogleChatRequest.php
-│   │
+│   │   └── RequirePersonalAccess.php
 │   └── Requests/
+│       ├── LoginRequest.php
 │       └── StoreWorklogRequest.php
-│
 ├── Services/
 │   ├── Jira/
 │   │   └── JiraClient.php
-│   │
 │   └── GoogleChat/
-│       ├── GoogleChatCommandParser.php
-│       └── GoogleChatResponseBuilder.php
-│
+│       └── GoogleChatNotifier.php
 └── Support/
     ├── DurationParser.php
     └── WorklogDateParser.php
+
+resources/
+├── css/
+│   └── app.css
+├── js/
+│   ├── app.js
+│   ├── App.vue
+│   └── components/
+│       ├── LoginForm.vue
+│       └── WorklogForm.vue
+└── views/
+    └── app.blade.php
 ```
 
-Not every class needs to exist immediately.
+Names may follow Laravel conventions discovered during implementation. Create only the components needed by the current phase.
 
-Create components only when their implementation phase requires them.
+The former `GoogleChatCommandParser`, `ParsedGoogleChatCommand`, `InvalidGoogleChatCommandException`, and `GoogleChatResponseBuilder` belong to the abandoned inbound slash-command design and should be removed during the Vue UI phase.
 
 ## 8. Worklog Model
 
@@ -231,6 +228,7 @@ A worklog operation consists conceptually of:
 ```text
 ticket
 duration
+durationSeconds
 started
 ```
 
@@ -245,21 +243,9 @@ started          = 2026-09-05T14:30:00+07:00
 
 No database model is required.
 
-## 9. Duration Parsing
+## 9. Duration, Date, and Time
 
-Input:
-
-```text
-2h15m
-```
-
-Output:
-
-```text
-8100
-```
-
-Supported grammar:
+Supported duration grammar:
 
 ```text
 <hours>h
@@ -267,21 +253,7 @@ Supported grammar:
 <hours>h<minutes>m
 ```
 
-Examples:
-
-```text
-15m
-30m
-1h
-2h
-1h30m
-2h15m
-8h
-```
-
-Duration must be greater than zero.
-
-## 10. Date and Time
+Duration must be greater than zero and is normalized to seconds.
 
 Timezone:
 
@@ -291,49 +263,15 @@ Asia/Ho_Chi_Minh
 
 Supported input modes:
 
-### No explicit date/time
+- no explicit date/time: use the current configured date/time
+- time only: use today at the supplied time
+- explicit date and time: use the supplied values
 
-```text
-/log BKM4-1234 2h15m
-```
+The Vue UI may prefill date and time for convenience, but Laravel remains authoritative. Never infer time from the server/container timezone.
 
-Started:
-
-```text
-now
-```
-
-### Time only
-
-```text
-/log BKM4-1234 2h15m 14:30
-```
-
-Started:
-
-```text
-today at 14:30
-```
-
-### Date and time
-
-```text
-/log BKM4-1234 2h15m 04/09/2026 14:30
-```
-
-Started:
-
-```text
-2026-09-04 14:30 Asia/Ho_Chi_Minh
-```
-
-Never infer these values from server timezone.
-
-## 11. Jira Integration
+## 10. Jira Integration
 
 Jira Cloud is the system of record for worklogs.
-
-Laravel communicates with Jira through REST API.
 
 Conceptual request:
 
@@ -341,7 +279,7 @@ Conceptual request:
 POST /rest/api/3/issue/{issueKey}/worklog
 ```
 
-Payload conceptually contains:
+Conceptual payload:
 
 ```json
 {
@@ -350,158 +288,127 @@ Payload conceptually contains:
 }
 ```
 
-Authentication credentials:
+Credentials are supplied through `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN`. The exact HTTP implementation belongs in `JiraClient`.
+
+## 11. Google Chat Notification
+
+Google Chat is not an input adapter. The current architecture does not include a Chat app, slash commands, Google request verification, or OAuth.
+
+After Jira creates a worklog, `GoogleChatNotifier` posts a concise message to the configured incoming webhook.
 
 ```text
-JIRA_BASE_URL
-JIRA_EMAIL
-JIRA_API_TOKEN
+✅ Jira Worklog Added
+
+🎫 BKM4-1234
+⏱ 2h 15m
+🕐 05/09/2026 14:30
 ```
 
-The exact Jira HTTP implementation belongs in `JiraClient`.
+The webhook URL comes from `config('services.google_chat.webhook_url')` backed by `GOOGLE_CHAT_WEBHOOK_URL`.
 
-## 12. Google Chat Integration
-
-Google Chat will be added after the core Laravel/Jira flow is operational.
-
-Google Chat responsibilities:
+### Failure Semantics
 
 ```text
-Receive event
-    ↓
-Verify Google request
-    ↓
-Verify allowed user
-    ↓
-Parse /log command
-    ↓
-Call existing LogWork use case
-    ↓
-Format response
+Jira failure
+    └── worklog request fails; do not notify
+
+Jira success + webhook success
+    └── worklog request succeeds; notificationSent = true
+
+Jira success + webhook failure
+    └── worklog request succeeds; notificationSent = false; log safe warning
 ```
 
-The Google Chat adapter must not duplicate worklog logic.
+Do not rollback Jira, retry by recreating the worklog, or expose the webhook URL.
 
-## 13. Authentication
+## 12. Authentication and Security
 
-### Jira
+The Render URL will be public, but the application is private to one user.
 
-Server-to-server authentication using the personal Jira credential configured on the deployment.
+Use a minimal personal-password login backed by a configured password hash and Laravel session. Protect both the Vue page and worklog API. Use Laravel CSRF protection, secure HTTP-only cookies in production, session regeneration on login/logout, and rate limiting on login attempts.
 
-### Google Chat
+No users table is required. Do not add registration, password reset, email verification, OAuth, or Google identity.
 
-Requests must be verified as authentic Google Chat requests.
+Authentication must be implemented and verified before Render deployment.
 
-Additionally, because this is a single-user application, requests must be restricted to the configured allowed Google identity.
+Secrets include:
 
-## 14. Persistence
+- Jira API token
+- Google Chat webhook URL
+- personal access password hash
+- Laravel application key
 
-No application database is required.
+Never expose these in browser bundles, logs, API responses, repository files, or Docker image layers.
 
-Do not introduce:
+## 13. Persistence
 
-```text
-MySQL
-PostgreSQL
-SQLite
-Redis
-```
+No application database is required. Jira remains the source of truth.
 
-unless future product requirements require persistence.
+Do not introduce MySQL, PostgreSQL, SQLite, Redis, or persistent worklog history unless a future requirement explicitly requires it. Session storage must use a deployment-compatible non-database driver for the single-instance MVP.
 
-Jira remains the source of truth for worklogs.
+## 14. Error Handling
 
-## 15. Error Handling
-
-External integration errors must be converted into application-friendly errors.
+Convert failures into concise application-friendly responses.
 
 Examples:
 
-```text
-Ticket not found
-Invalid duration
-Invalid date
-Invalid time
-Jira authentication failed
-Jira rejected worklog
-Google request verification failed
-Unauthorized Google user
-```
+- invalid ticket, duration, date, or time
+- unauthenticated or rate-limited access
+- Jira authentication, authorization, validation, timeout, or network failure
+- Google Chat notification unavailable or failed
 
-Do not expose:
+Do not expose tokens, credentials, sensitive headers, webhook URLs, or unnecessary external stack traces.
 
-- API tokens
-- raw credentials
-- sensitive headers
-- unnecessary external stack traces
-
-## 16. Testing Strategy
+## 15. Testing Strategy
 
 ### Unit Tests
 
-Test pure behavior:
-
-```text
-DurationParser
-WorklogDateParser
-GoogleChatCommandParser
-```
+Test pure behavior including duration parsing, date/time parsing, notification formatting, and authentication helpers when applicable.
 
 ### Feature Tests
 
 Test:
 
-```text
-POST /api/worklogs
-```
+- authenticated and guest page/API access
+- login, logout, incorrect password, and rate limiting
+- `POST /api/worklogs` with Jira mocked
+- Google Chat webhook success and failure with HTTP mocked
+- Jira success remains successful when notification fails
+- external secrets are not returned
 
-with Jira mocked.
+### Frontend Verification
 
-Later test Google Chat HTTP event handling separately.
+Verify the Vite production build and the form's loading, validation, success, notification-warning, and Jira-error states.
 
-### Integration Testing
+Real Jira and Google Chat calls are manual integration tests and must not run in the normal automated test suite.
 
-Real Jira calls are manual/integration tests and must not run in the normal automated test suite.
+## 16. Explicit Non-Goals
 
-## 17. Explicit Non-Goals
-
-For the initial product:
+For the current product:
 
 - no database
-- no frontend
-- no dashboard
-- no Jira OAuth
 - no multi-user support
-- no Google login page
-- no queues
-- no Redis
+- no user registration or recovery
+- no Jira OAuth
+- no Google Chat app or slash commands
+- no Google OAuth
+- no Vue Router or Pinia
+- no general dashboard
+- no worklog history storage
+- no queues or Redis
 - no scheduler
 - no microservices
-- no DDD aggregates
-- no event sourcing
+- no DDD aggregates or event sourcing
 
-These can be reconsidered only when a concrete requirement appears.
+## 17. Architectural Principle
 
-## 18. Architectural Principle
-
-The central architectural rule is:
+The central rule is:
 
 ```text
-Google Chat and HTTP are inputs.
-
-Jira is an output.
-
-LogWork is the application use case.
+Vue and HTTP are inputs.
+Jira worklog creation is the primary output.
+Google Chat notification is a secondary output.
+LogWork remains the application use case.
 ```
 
-Therefore:
-
-```text
-Google Chat ──┐
-              │
-HTTP API ─────┼──> LogWork ──> Jira
-              │
-Future CLI ───┘
-```
-
-Adding or changing an input adapter must not require rewriting the Jira integration or the core worklog use case.
+Changing the presentation or notification channel must not require rewriting Jira integration or core parsing behavior.

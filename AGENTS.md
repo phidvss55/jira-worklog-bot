@@ -2,29 +2,23 @@
 
 ## Project Overview
 
-This project is a personal Jira Worklog Bot built with Laravel.
+This project is a personal Jira Worklog application built with Laravel and Vue.
 
-The application allows a single user to log work to Jira using a simple command such as:
-
-```text
-/log BKM4-1234 2h15m
-/log BKM4-1234 2h15m 14:30
-/log BKM4-1234 2h15m 04/09/2026 14:30
-```
-
-The final integration flow will be:
+One user opens a small web UI, enters a Jira ticket and duration, and creates a Jira Cloud worklog. After Jira accepts the worklog, Laravel attempts to notify a Google Chat space through an incoming webhook.
 
 ```text
-Google Chat
+Browser
+    ↓
+Vue + Vite
     ↓
 Laravel API
     ↓
 Jira Cloud REST API
+    ↓
+Google Chat Incoming Webhook notification
 ```
 
-The application is intended for a single user only.
-
-Do not introduce multi-user architecture unless explicitly requested.
+The application is intended for a single user only. Do not introduce multi-user architecture unless explicitly requested.
 
 ## Required Reading
 
@@ -44,21 +38,22 @@ Use:
 
 - PHP 8.3+
 - Laravel 12+
-- Composer
+- Vue 3
+- Vite
+- Composer and npm
 - PHPUnit / Pest according to the Laravel project default
 - Laravel HTTP Client for external HTTP requests
+- Laravel session and CSRF protection
 - Docker
 - Render for deployment
 - Jira Cloud REST API
-- Google Chat API in a later implementation phase
+- Google Chat Incoming Webhook
 
-Do not introduce additional frameworks or infrastructure unless required.
+Do not introduce additional frontend frameworks, state-management libraries, databases, or infrastructure unless required.
 
 ## Architecture Principles
 
-Keep the application simple.
-
-This is a small stateless integration service, not a large enterprise application.
+Keep the application simple. This is a small single-user integration application, not a multi-user product or enterprise platform.
 
 Do not introduce:
 
@@ -78,20 +73,18 @@ unless a future requirement explicitly requires them.
 Use a lightweight layered architecture:
 
 ```text
-HTTP / Integration Adapter
+Vue UI / HTTP Adapter
         ↓
 Application
         ↓
 Services / External Clients
 ```
 
-Controllers must remain thin.
+Controllers must remain thin. Business logic must not be implemented directly inside controllers or Vue components.
 
-Business/application logic must not be implemented directly inside controllers.
+External Jira HTTP logic must remain inside the Jira integration layer. Google Chat webhook formatting and delivery must remain isolated from the Jira client.
 
-External Jira-specific HTTP logic must remain inside the Jira integration layer.
-
-Google Chat-specific parsing and response formatting must remain isolated from Jira integration.
+Jira worklog creation is the primary business operation. Google Chat notification is a secondary best-effort side effect. A notification failure must never roll back or report the already-created Jira worklog as failed.
 
 ## Expected Project Structure
 
@@ -103,47 +96,60 @@ app/
 │   └── Worklog/
 │       ├── LogWorkCommand.php
 │       └── LogWorkHandler.php
-│
 ├── Http/
 │   ├── Controllers/
 │   ├── Middleware/
 │   └── Requests/
-│
 ├── Services/
 │   ├── Jira/
 │   └── GoogleChat/
-│
+│       └── GoogleChatNotifier.php
 └── Support/
     ├── DurationParser.php
     └── WorklogDateParser.php
+
+resources/
+├── css/
+│   └── app.css
+├── js/
+│   ├── app.js
+│   ├── App.vue
+│   └── components/
+│       ├── LoginForm.vue
+│       └── WorklogForm.vue
+└── views/
+    └── app.blade.php
 ```
 
 Do not reorganize the project substantially without a concrete reason.
 
+Remove the obsolete Google Chat command input classes when implementing the Vue UI. Do not retain dead slash-command parsing code for possible future use.
+
 ## Coding Guidelines
 
-Follow Laravel conventions where possible.
+Follow Laravel and Vue conventions where possible.
 
 Prefer:
 
 - constructor dependency injection
-- typed properties
-- typed parameters
-- typed return values
+- typed PHP properties, parameters, and return values
 - immutable DTO/command objects where practical
 - Laravel configuration instead of direct environment access
-- small focused classes
-- descriptive method names
+- small focused classes and Vue components
+- browser-native form controls where they provide good UX
+- explicit loading, success, validation, and failure states
+- descriptive method and component names
 
 Avoid:
 
 - static service classes
 - global helper functions for business logic
 - accessing `env()` outside configuration files
-- duplicated parsing logic
-- large controllers
+- duplicated parsing or validation logic
+- large controllers or Vue components
+- Vue Router, Pinia, or a UI framework for the single-page MVP
 - catching `Throwable` without a concrete reason
-- unnecessary comments that simply repeat the code
+- unnecessary comments that repeat the code
 
 Prefer simple code over clever code.
 
@@ -151,64 +157,62 @@ Prefer simple code over clever code.
 
 Environment-specific configuration must live in configuration files.
 
-For example:
-
 ```php
 config('services.jira.url');
 config('services.jira.email');
 config('services.jira.token');
+config('services.google_chat.webhook_url');
 ```
 
-Do not use:
+Do not use `env()` inside application or service classes.
 
-```php
-env('JIRA_TOKEN')
-```
-
-inside application or service classes.
-
-Secrets must never be committed.
-
-Expected future environment variables include:
+Secrets must never be committed. Expected environment variables include:
 
 ```text
 APP_TIMEZONE=Asia/Ho_Chi_Minh
-
 JIRA_BASE_URL=
 JIRA_EMAIL=
 JIRA_API_TOKEN=
-
-GOOGLE_ALLOWED_USER=
-GOOGLE_CHAT_AUDIENCE=
+GOOGLE_CHAT_WEBHOOK_URL=
+APP_ACCESS_PASSWORD_HASH=
 ```
 
-Update `.env.example` whenever a new environment variable is introduced.
+The Google Chat webhook URL is a secret because anyone holding it can post to the configured space. The personal access password must be stored only as a server-side hash, never as plaintext.
 
-## Date and Time Rules
+Update `.env.example` whenever an environment variable is implemented. Never place real credentials or hashes in it.
 
-All user-entered worklog times are interpreted using:
+## Authentication
+
+The deployed UI and worklog API must not be public.
+
+Use a minimal single-user Laravel session flow protected by one configured personal password hash. Protect both the UI and `POST /api/worklogs`; hiding the form alone is insufficient.
+
+Use Laravel's existing session, cookie, rate-limiting, and CSRF capabilities. Do not add:
+
+- a users table
+- registration
+- password reset
+- email verification
+- OAuth
+- Google login
+- Sanctum unless a later requirement needs token-based clients
+
+Authentication must be complete before public Render deployment.
+
+## Worklog Input Rules
+
+The Vue form accepts:
 
 ```text
-Asia/Ho_Chi_Minh
+ticket    required
+duration  required
+date      optional/default today
+time      optional/default now
 ```
 
-unless configuration explicitly overrides it.
+All worklog times are interpreted using `Asia/Ho_Chi_Minh` unless configuration explicitly overrides it. Never rely on the server/container timezone.
 
-Never rely on the server/container timezone.
-
-The application must support:
-
-```text
-/log BKM4-1234 2h15m
-/log BKM4-1234 2h15m 14:30
-/log BKM4-1234 2h15m 04/09/2026 14:30
-```
-
-See `DESIGN.md` for exact behavior.
-
-## Duration Rules
-
-Supported examples:
+Supported duration examples:
 
 ```text
 15m
@@ -220,70 +224,37 @@ Supported examples:
 8h
 ```
 
-Duration must eventually be normalized into seconds for Jira.
-
-Examples:
-
-```text
-15m    → 900
-1h     → 3600
-1h30m  → 5400
-2h15m  → 8100
-```
-
-Do not duplicate duration parsing across controllers or integrations.
+Duration must be normalized into seconds for Jira. Do not duplicate duration or date parsing in controllers, Vue components, or integrations. Client-side validation improves UX but server-side validation remains authoritative.
 
 ## Jira Integration
 
-All Jira communication must go through a dedicated Jira client/service.
+All Jira communication must go through the dedicated Jira client/service.
 
-Do not call Jira directly from:
+Do not call Jira directly from controllers, Vue-related code, or Google Chat services.
 
-- controllers
-- Google Chat services
-- command parsers
-
-The application will use Jira Cloud REST API.
-
-Worklog creation will use Jira's issue worklog endpoint.
-
-Jira credentials must remain server-side.
+Worklog creation uses Jira Cloud's issue worklog endpoint. Jira credentials must remain server-side.
 
 ## Google Chat Integration
 
-Google Chat is an adapter around the existing worklog application flow.
-
-Google Chat integration must not contain Jira business logic.
-
-Expected future flow:
+Google Chat is an output notification integration only.
 
 ```text
-Google Chat Event
-       ↓
-Verify Google Request
-       ↓
-Parse /log command
-       ↓
-LogWorkCommand
-       ↓
-LogWorkHandler
-       ↓
-JiraClient
-       ↓
-Google Chat Response
+Jira success
+    ↓
+GoogleChatNotifier
+    ↓
+Incoming Webhook
+    ↓
+Google Chat space
 ```
 
-Google Chat integration is not part of the initial implementation phase unless `TASKS.md` indicates otherwise.
+Do not implement a Google Chat app, slash command, command parser, Google request verification, or Google OAuth for the current product direction.
+
+If the webhook is missing or delivery fails, log a safe warning and return a successful worklog result with notification status. Do not expose the webhook URL or convert the Jira success into an API failure.
 
 ## API
 
-During development, expose a temporary/manual endpoint:
-
-```text
-POST /api/worklogs
-```
-
-Example:
+The Vue UI uses `POST /api/worklogs`.
 
 ```json
 {
@@ -294,97 +265,46 @@ Example:
 }
 ```
 
-This endpoint exists to test the core worklog flow independently of Google Chat.
+The endpoint must require the authenticated Laravel session and CSRF protection.
 
 ## Testing Requirements
 
-Add tests for behavior rather than implementation details.
+Add tests for behavior rather than implementation details. At minimum test:
 
-At minimum test:
+- duration and date/time parsing
+- valid and invalid worklog requests
+- Jira success and failure mapping
+- guest access rejection
+- login success, failure, logout, and rate limiting
+- Vue-facing response contract
+- Google Chat notification success and failure
+- Jira success remaining successful when notification delivery fails
 
-### DurationParser
+Mock Jira and Google Chat HTTP calls in automated tests. Never call real external services from the normal test suite.
 
-Valid:
+## Docker and Render
 
-```text
-15m
-1h
-1h30m
-2h15m
-8h
-```
+The application must be runnable locally with Docker, including compiled Vite assets, and compatible with Render deployment.
 
-Invalid examples:
+Keep the image minimal and reproducible. Do not add database, Redis, or queue containers.
 
-```text
-abc
-2hours
--1h
-0h
-```
-
-### WorklogDateParser
-
-Test:
-
-- no date/time
-- time only
-- explicit date and time
-- invalid date
-- invalid time
-- configured timezone
-
-### API
-
-Test:
-
-- valid worklog request
-- invalid ticket
-- invalid duration
-- invalid date
-- invalid time
-- Jira service failure
-
-Mock external Jira HTTP calls in automated tests.
-
-Never call real Jira from the normal test suite.
-
-## Docker
-
-The application must be runnable locally with Docker.
-
-The Docker image should also be compatible with Render deployment.
-
-Keep the image minimal and reproducible.
-
-Do not add database containers, Redis, or other services unless required by future requirements.
+Before public deployment, verify authentication protects the UI and API and all secrets are supplied through Render environment variables.
 
 ## Before Completing a Task
 
 Before considering implementation complete:
 
 1. Run formatting/linting if configured.
-2. Run the test suite.
-3. Verify no secrets were committed.
-4. Verify `.env.example` is current.
-5. Verify implementation follows `ARCHITECTURE.md`.
-6. Update `TASKS.md` when implementation progress changes.
-7. Do not mark a task complete if tests are failing.
+2. Run the relevant frontend build and test commands.
+3. Run the complete PHP test suite.
+4. Verify no secrets were committed.
+5. Verify `.env.example` is current.
+6. Verify implementation follows `ARCHITECTURE.md` and `DESIGN.md`.
+7. Update `TASKS.md` when implementation progress changes.
+8. Do not mark a task complete if tests or the production build fail.
 
 ## Scope Control
 
-When implementing a task, implement only what is necessary for that task.
+Implement only the current phase in `TASKS.md`.
 
-Do not proactively implement future phases.
-
-For example, while implementing the Laravel core:
-
-Do not also implement:
-
-- Google Chat integration
-- Jira OAuth
-- database persistence
-- user management
-- deployment infrastructure
-
-unless the task explicitly asks for them.
+Do not proactively implement future phases. In particular, do not add multi-user support, database persistence, Jira OAuth, worklog history, worklog editing/deletion, Google Chat interactive commands, queues, or deployment infrastructure unless the current task explicitly includes them.

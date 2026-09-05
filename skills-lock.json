@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "jira-integration": {
+      "source": "affaan-m/ecc",
+      "sourceType": "github",
+      "skillPath": "skills/jira-integration/SKILL.md",
+      "computedHash": "88cd7147e73f66aca80e10364e4af44feda3c8d04816de7505941e7386aee0d1"
+    },
+    "laravel-specialist": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/laravel-specialist/SKILL.md",
+      "computedHash": "d58e2ed3488398cb94a039f25b9d270e55dc434e16102abff9035608bec3db90"
+    }
+  }
+}
