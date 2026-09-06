@@ -40,7 +40,8 @@ final class WorklogController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $result,
+            'data' => $result['data'],
+            'notificationSent' => $result['notificationSent'],
         ]);
     }
 }

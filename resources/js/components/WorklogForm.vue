@@ -20,9 +20,10 @@ const form = reactive({
 });
 const errors = reactive({});
 const isSubmitting = ref(false);
+const isLoggingOut = ref(false);
 const result = ref(null);
 const generalError = ref('');
-const sessionExpired = ref(false);
+const generalErrorTitle = ref('Unable to log work');
 
 function normalizeTicket(event) {
     form.ticket = event.target.value.toUpperCase();
@@ -41,7 +42,45 @@ function displayDuration(duration) {
 function clearErrors() {
     Object.keys(errors).forEach((field) => delete errors[field]);
     generalError.value = '';
-    sessionExpired.value = false;
+    generalErrorTitle.value = 'Unable to log work';
+}
+
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+}
+
+async function logout() {
+    if (isLoggingOut.value) {
+        return;
+    }
+
+    isLoggingOut.value = true;
+    generalError.value = '';
+
+    try {
+        const response = await fetch('/logout', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+        });
+
+        if (response.ok || response.status === 401 || response.status === 419) {
+            window.location.assign('/login');
+
+            return;
+        }
+
+        generalErrorTitle.value = 'Unable to log out';
+        generalError.value = 'Please try again.';
+    } catch {
+        generalErrorTitle.value = 'Unable to log out';
+        generalError.value = 'Check your connection and try again.';
+    } finally {
+        isLoggingOut.value = false;
+    }
 }
 
 async function submit() {
@@ -67,15 +106,14 @@ async function submit() {
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                'X-CSRF-TOKEN': csrfToken(),
             },
             body: JSON.stringify(submitted),
         });
         const body = await response.json().catch(() => ({}));
 
         if (response.status === 401 || response.status === 419) {
-            sessionExpired.value = true;
-            generalError.value = 'Your session has expired. Sign in again before submitting.';
+            window.location.assign('/login');
 
             return;
         }
@@ -117,6 +155,9 @@ async function submit() {
                 <h1 id="worklog-title">Jira Worklog</h1>
                 <p class="subtitle">Log your working time without breaking focus.</p>
             </div>
+            <button class="logout-button" type="button" :disabled="isLoggingOut" @click="logout">
+                {{ isLoggingOut ? 'Logging out…' : 'Log out' }}
+            </button>
         </header>
 
         <form class="worklog-form" novalidate @submit.prevent="submit">
@@ -208,7 +249,7 @@ async function submit() {
             <div v-else-if="generalError" class="status-message status-error" role="alert">
                 <span class="status-icon" aria-hidden="true">!</span>
                 <div>
-                    <strong>{{ sessionExpired ? 'Session expired' : 'Unable to log work' }}</strong>
+                    <strong>{{ generalErrorTitle }}</strong>
                     <p>{{ generalError }}</p>
                 </div>
             </div>

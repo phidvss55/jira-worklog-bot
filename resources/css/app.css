@@ -41,11 +41,48 @@ input {
     box-shadow: 0 24px 70px rgba(30, 52, 87, 0.13);
 }
 
+.login-card {
+    width: min(100%, 460px);
+}
+
 .card-header {
     display: flex;
     align-items: flex-start;
     gap: 16px;
     margin-bottom: 30px;
+}
+
+.card-header > div:nth-child(2) {
+    min-width: 0;
+}
+
+.logout-button {
+    flex: 0 0 auto;
+    min-height: 40px;
+    margin-left: auto;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e3;
+    border-radius: 10px;
+    color: #3d4d68;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.logout-button:hover:not(:disabled) {
+    border-color: #9eacc1;
+    background: #f7f9fc;
+}
+
+.logout-button:focus-visible {
+    outline: 3px solid rgba(61, 91, 216, 0.24);
+    outline-offset: 2px;
+}
+
+.logout-button:disabled {
+    cursor: wait;
+    opacity: 0.68;
 }
 
 .brand-mark {

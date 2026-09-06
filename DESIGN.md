@@ -30,15 +30,15 @@ The MVP is a small Laravel + Vue application, not a dashboard. It does not requi
 
 ## 3. Authentication Experience
 
-When no authenticated session exists, show a minimal password screen.
+When no authenticated session exists, show a minimal authenticator-code screen.
 
 ```text
 ┌─────────────────────────────────────┐
 │ Jira Worklog                        │
 │                                     │
-│ Personal password                   │
+│ Authenticator code                  │
 │ ┌─────────────────────────────────┐ │
-│ │ ••••••••••••                    │ │
+│ │ 123456                          │ │
 │ └─────────────────────────────────┘ │
 │                                     │
 │              [ Sign in ]            │
@@ -47,10 +47,10 @@ When no authenticated session exists, show a minimal password screen.
 
 Requirements:
 
-- do not reveal whether configuration or password details are wrong
+- do not reveal whether configuration or TOTP details are wrong
 - disable the submit button and show progress while signing in
 - show a concise error for rejected or rate-limited attempts
-- never store the plaintext password in local storage
+- never store the TOTP code or secret in local storage
 - provide a simple logout action after authentication
 
 No registration, password reset, profile, account management, or Google login is needed.
@@ -187,7 +187,7 @@ Use a more specific reason only when Jira provides one that is safe and useful. 
 
 ### Session Expired
 
-Return the user to the password screen with a concise message. Preserve worklog input in memory when practical, but do not store sensitive authentication data.
+Return the user to the authenticator-code screen with a concise message. Preserve worklog input in memory when practical, but do not store sensitive authentication data.
 
 ## 9. API Contract
 
@@ -223,7 +223,7 @@ Successful response:
 
 If Jira succeeds and the notification fails, return the same successful worklog data with `notificationSent: false`.
 
-The API must reject unauthenticated requests. It must never expose Jira credentials, the personal password hash, or the Google Chat webhook URL.
+The API must reject unauthenticated requests. It must never expose Jira credentials, the TOTP secret, or the Google Chat webhook URL.
 
 ## 10. Google Chat Notification
 

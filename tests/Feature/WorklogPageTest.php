@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\EnsureWorklogAuthenticated;
 use Carbon\CarbonImmutable;
 use Tests\TestCase;
 
@@ -20,7 +21,8 @@ final class WorklogPageTest extends TestCase
         config(['app.timezone' => 'Asia/Ho_Chi_Minh']);
         CarbonImmutable::setTestNow('2026-09-05T16:24:00+07:00');
 
-        $this->get('/')
+        $this->withSession([EnsureWorklogAuthenticated::SESSION_KEY => true])
+            ->get('/')
             ->assertOk()
             ->assertSee('id="app"', false)
             ->assertSee('data-default-date="2026-09-05"', false)

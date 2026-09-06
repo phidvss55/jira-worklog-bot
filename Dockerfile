@@ -41,8 +41,11 @@ ENV APP_ENV=production \
     APP_DEBUG=false \
     LOG_CHANNEL=stderr \
     LOG_LEVEL=info \
-    SESSION_DRIVER=cookie \
-    CACHE_STORE=array \
+    SESSION_DRIVER=file \
+    SESSION_SECURE_COOKIE=true \
+    SESSION_HTTP_ONLY=true \
+    SESSION_SAME_SITE=lax \
+    CACHE_STORE=file \
     QUEUE_CONNECTION=sync \
     PORT=8080
 

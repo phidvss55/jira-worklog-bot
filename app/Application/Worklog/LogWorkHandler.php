@@ -6,10 +6,16 @@ use App\Services\Jira\JiraClient;
 
 final readonly class LogWorkHandler
 {
-    public function __construct(private JiraClient $jiraClient) {}
+    public function __construct(
+        private JiraClient $jiraClient,
+        private WorklogNotifier $notifier,
+    ) {}
 
     /**
-     * @return array{ticket: string, duration: string, durationSeconds: int, started: string}
+     * @return array{
+     *     data: array{ticket: string, duration: string, durationSeconds: int, started: string},
+     *     notificationSent: bool
+     * }
      */
     public function handle(LogWorkCommand $command): array
     {
@@ -19,6 +25,9 @@ final readonly class LogWorkHandler
             $command->started,
         );
 
-        return $command->toArray();
+        return [
+            'data' => $command->toArray(),
+            'notificationSent' => $this->notifier->notify($command),
+        ];
     }
 }

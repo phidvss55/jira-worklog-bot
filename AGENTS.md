@@ -174,10 +174,10 @@ JIRA_BASE_URL=
 JIRA_EMAIL=
 JIRA_API_TOKEN=
 GOOGLE_CHAT_WEBHOOK_URL=
-APP_ACCESS_PASSWORD_HASH=
+WORKLOG_TOTP_SECRET=
 ```
 
-The Google Chat webhook URL is a secret because anyone holding it can post to the configured space. The personal access password must be stored only as a server-side hash, never as plaintext.
+The Google Chat webhook URL and TOTP secret are sensitive server-side credentials. Never expose either value to the browser, logs, or source control.
 
 Update `.env.example` whenever an environment variable is implemented. Never place real credentials or hashes in it.
 
@@ -185,7 +185,7 @@ Update `.env.example` whenever an environment variable is implemented. Never pla
 
 The deployed UI and worklog API must not be public.
 
-Use a minimal single-user Laravel session flow protected by one configured personal password hash. Protect both the UI and `POST /api/worklogs`; hiding the form alone is insufficient.
+Use a minimal single-user Laravel session flow protected by one configured TOTP secret. Protect both the UI and `POST /api/worklogs`; hiding the form alone is insufficient.
 
 Use Laravel's existing session, cookie, rate-limiting, and CSRF capabilities. Do not add:
 

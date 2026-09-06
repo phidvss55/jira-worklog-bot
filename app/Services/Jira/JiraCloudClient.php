@@ -26,9 +26,9 @@ final readonly class JiraCloudClient implements JiraClient
                 [
                     'timeSpentSeconds' => $durationSeconds,
                     'started' => $started->format('Y-m-d\TH:i:s.vO'),
-                ],
+                ]
             );
-        } catch (ConnectionException) {
+        } catch (ConnectionException $exception) {
             throw new JiraClientException('Unable to connect to Jira.');
         }
 
@@ -39,7 +39,7 @@ final readonly class JiraCloudClient implements JiraClient
     {
         try {
             $response = $this->request()->get('/rest/api/3/myself');
-        } catch (ConnectionException) {
+        } catch (ConnectionException $exception) {
             throw new JiraClientException('Unable to connect to Jira.');
         }
 

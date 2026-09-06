@@ -91,7 +91,7 @@ Goal: Replace command-based input with a small authenticated Vue UI that uses th
 
 [x] Create the Blade entry point and mount one Vue application.
 
-[ ] Create focused login and worklog form components.
+[x] Create a focused login screen and worklog form component.
 
 [x] Do not add Vue Router, Pinia, or a UI framework.
 
@@ -115,23 +115,27 @@ Goal: Replace command-based input with a small authenticated Vue UI that uses th
 
 ## Personal Session Authentication
 
-[ ] Add a server-configured `APP_ACCESS_PASSWORD_HASH` placeholder to `.env.example`.
+[x] Add a server-configured `WORKLOG_TOTP_SECRET` placeholder to `.env.example`.
 
-[ ] Implement a minimal login endpoint and screen using the configured password hash.
+[x] Implement a minimal login endpoint and screen using the configured TOTP secret.
 
-[ ] Regenerate the Laravel session after successful login and logout.
+[x] Verify six-digit TOTP codes with a 30-second period and one-period clock drift.
 
-[ ] Protect both the application page and `POST /api/worklogs` with session authentication.
+[x] Add `worklog:totp-setup` to generate a secret and authenticator provisioning URI.
 
-[ ] Use Laravel CSRF protection for state-changing browser requests.
+[x] Regenerate the Laravel session after successful login and logout.
 
-[ ] Rate-limit failed login attempts.
+[x] Protect both the application page and `POST /api/worklogs` with session authentication.
 
-[ ] Do not add a users table, registration, password recovery, OAuth, Google login, or Sanctum.
+[x] Use Laravel CSRF protection for state-changing browser requests.
+
+[x] Rate-limit failed login attempts.
+
+[x] Do not add a users table, registration, password recovery, OAuth, Google login, or Sanctum.
 
 ## Verification
 
-[ ] Add feature tests for guest rejection, successful login, invalid password, logout, rate limiting, and authenticated worklog submission.
+[x] Add feature tests for guest rejection, successful TOTP login, invalid codes, logout, rate limiting, and authenticated worklog submission.
 
 [x] Verify relevant accessibility behavior and responsive layout.
 
@@ -147,25 +151,25 @@ Goal: Replace command-based input with a small authenticated Vue UI that uses th
 
 Goal: Notify a Google Chat space after Jira successfully creates a worklog.
 
-[ ] Add `GOOGLE_CHAT_WEBHOOK_URL` to `.env.example` without a real URL.
+[x] Add `GOOGLE_CHAT_WEBHOOK_URL` to `.env.example` without a real URL.
 
-[ ] Map the environment variable through `config/services.php`.
+[x] Map the environment variable through `config/services.php`.
 
-[ ] Implement `GoogleChatNotifier` using Laravel HTTP Client.
+[x] Implement `GoogleChatNotifier` using Laravel HTTP Client.
 
-[ ] Send a concise message containing ticket, human-readable duration, and started date/time.
+[x] Send a concise message containing ticket, human-readable duration, and started date/time.
 
-[ ] Invoke the notifier only after Jira succeeds.
+[x] Invoke the notifier only after Jira succeeds.
 
-[ ] Return `notificationSent: true` after successful delivery.
+[x] Return `notificationSent: true` after successful delivery.
 
-[ ] On missing configuration or delivery failure, log a safe warning and return `notificationSent: false` while keeping the worklog response successful.
+[x] On missing configuration or delivery failure, log a safe warning and return `notificationSent: false` while keeping the worklog response successful.
 
-[ ] Never retry by creating another Jira worklog.
+[x] Never retry by creating another Jira worklog.
 
-[ ] Add mocked HTTP tests for notification success, missing configuration, timeout, rejection, and safe logging.
+[x] Add mocked HTTP tests for notification success, missing configuration, timeout, rejection, and safe logging.
 
-[ ] Test explicitly that Jira failure does not notify and notification failure does not change Jira success.
+[x] Test explicitly that Jira failure does not notify and notification failure does not change Jira success.
 
 ---
 
@@ -201,7 +205,7 @@ Goal: Deploy the protected application and configure external integrations.
 
 [ ] Configure Docker deployment.
 
-[ ] Configure `APP_KEY`, secure production session settings, `APP_ACCESS_PASSWORD_HASH`, Jira credentials, and `GOOGLE_CHAT_WEBHOOK_URL` as Render secrets.
+[ ] Configure `APP_KEY`, secure production session settings, `WORKLOG_TOTP_SECRET`, Jira credentials, and `GOOGLE_CHAT_WEBHOOK_URL` as Render secrets.
 
 [ ] Deploy and verify the public health endpoint.
 

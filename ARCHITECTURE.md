@@ -4,7 +4,7 @@
 
 Jira Worklog Bot is a personal web application for logging work to Jira Cloud.
 
-A single user signs in with a personal password, submits a small Vue form, and Laravel creates the Jira worklog. After Jira succeeds, Laravel attempts to send a best-effort notification to a Google Chat space through an incoming webhook.
+A single user signs in with a six-digit authenticator code, submits a small Vue form, and Laravel creates the Jira worklog. After Jira succeeds, Laravel attempts to send a best-effort notification to a Google Chat space through an incoming webhook.
 
 The application remains intentionally small and single-user.
 
@@ -325,7 +325,9 @@ Do not rollback Jira, retry by recreating the worklog, or expose the webhook URL
 
 The Render URL will be public, but the application is private to one user.
 
-Use a minimal personal-password login backed by a configured password hash and Laravel session. Protect both the Vue page and worklog API. Use Laravel CSRF protection, secure HTTP-only cookies in production, session regeneration on login/logout, and rate limiting on login attempts.
+Use a minimal TOTP login backed by a configured server-side secret and Laravel session. Protect both the Vue page and worklog API. Use Laravel CSRF protection, secure HTTP-only cookies in production, session regeneration on login/logout, and rate limiting on login attempts.
+
+TOTP uses six digits, a 30-second period, SHA-1, and accepts only the previous, current, or next period. The MVP does not persist used time steps, so it does not prevent reuse of a valid code within that short window.
 
 No users table is required. Do not add registration, password reset, email verification, OAuth, or Google identity.
 
@@ -335,7 +337,7 @@ Secrets include:
 
 - Jira API token
 - Google Chat webhook URL
-- personal access password hash
+- TOTP secret
 - Laravel application key
 
 Never expose these in browser bundles, logs, API responses, repository files, or Docker image layers.
@@ -345,6 +347,8 @@ Never expose these in browser bundles, logs, API responses, repository files, or
 No application database is required. Jira remains the source of truth.
 
 Do not introduce MySQL, PostgreSQL, SQLite, Redis, or persistent worklog history unless a future requirement explicitly requires it. Session storage must use a deployment-compatible non-database driver for the single-instance MVP.
+
+Production uses file-backed sessions. A container restart or redeploy may log the user out, and horizontal scaling would require shared session storage in a future architecture.
 
 ## 14. Error Handling
 
@@ -370,7 +374,7 @@ Test pure behavior including duration parsing, date/time parsing, notification f
 Test:
 
 - authenticated and guest page/API access
-- login, logout, incorrect password, and rate limiting
+- login, logout, invalid authenticator code, and rate limiting
 - `POST /api/worklogs` with Jira mocked
 - Google Chat webhook success and failure with HTTP mocked
 - Jira success remains successful when notification fails
