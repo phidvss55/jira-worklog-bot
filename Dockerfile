@@ -61,6 +61,9 @@ RUN mkdir -p \
         storage/framework/sessions \
         storage/framework/views \
         storage/logs \
+    && setcap -r /usr/local/bin/frankenphp \
+    && chmod 0755 /usr/local/bin/frankenphp \
+    && test -z "$(getcap /usr/local/bin/frankenphp)" \
     && chown -R www-data:www-data bootstrap/cache storage /data /config
 
 USER www-data
@@ -68,4 +71,4 @@ USER www-data
 EXPOSE 8080
 
 ENTRYPOINT ["app-entrypoint"]
-CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
+CMD ["/usr/local/bin/frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]

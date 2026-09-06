@@ -17,7 +17,7 @@ final class WorklogController extends Controller
         StoreWorklogRequest $request,
         DurationParser $durationParser,
         WorklogDateParser $dateParser,
-        LogWorkHandler $handler,
+        LogWorkHandler $handler
     ): JsonResponse {
         /** @var array{ticket: string, duration: string, date?: string|null, time?: string|null} $input */
         $input = $request->validated();
@@ -31,7 +31,7 @@ final class WorklogController extends Controller
 
         try {
             $result = $handler->handle($command);
-        } catch (JiraClientException) {
+        } catch (JiraClientException $exception) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to log work. Jira rejected the worklog.',

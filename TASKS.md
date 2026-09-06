@@ -183,6 +183,8 @@ Goal: Produce a minimal reproducible image that serves Laravel and compiled Vue 
 
 [x] Publish `phidinh/jira-worklog-bot:latest` and an immutable commit SHA tag on every push to `main` through GitHub Actions.
 
+[x] Remove FrankenPHP's privileged-port capability for the non-root Render runtime.
+
 [ ] Build and run the container locally.
 
 [ ] Verify `GET /health`, login, the Vue page, and authenticated `POST /api/worklogs`.
