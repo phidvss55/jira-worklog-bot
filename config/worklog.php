@@ -2,6 +2,8 @@
 
 return [
 
+    'daily_target_minutes' => 420,
+
     'auth' => [
         'totp_secret' => env('WORKLOG_TOTP_SECRET'),
         'totp_period' => 30,

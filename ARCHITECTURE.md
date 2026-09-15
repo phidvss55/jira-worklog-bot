@@ -147,6 +147,8 @@ Going above 7 hours should be displayed as an informational/warning state, not b
 
 Today's summary must refresh after a successful worklog.
 
+The read use case calculates the configured product-local day server-side. It first uses Jira enhanced JQL search for issues with the authenticated user's worklogs in that date range, uses the embedded worklogs when complete, and fetches paginated issue worklogs only when Jira reports an incomplete embedded page. The Jira integration then filters by the authenticated account ID and the local start/end boundary before returning normalized data to the application layer.
+
 ## Frontend Architecture
 
 Keep Vue small and local-state driven. Do not add Pinia/Vuex unless future requirements justify it.

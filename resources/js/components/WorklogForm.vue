@@ -138,6 +138,7 @@ async function submit() {
             time: submitted.time,
             notificationSent: typeof body.notificationSent === 'boolean' ? body.notificationSent : null,
         };
+        window.dispatchEvent(new Event('worklog-created'));
     } catch {
         generalError.value = 'Unable to reach the application. Check your connection and try again.';
     } finally {

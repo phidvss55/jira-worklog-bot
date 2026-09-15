@@ -26,6 +26,11 @@ final class MockJiraClient implements JiraClient
         return 'mock-account-id';
     }
 
+    public function worklogsForUserBetween(string $accountId, CarbonImmutable $start, CarbonImmutable $end): array
+    {
+        return [];
+    }
+
     public function activeSprint(): ?JiraActiveSprint
     {
         return null;

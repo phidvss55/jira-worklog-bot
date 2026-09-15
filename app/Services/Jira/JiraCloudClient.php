@@ -69,6 +69,41 @@ final readonly class JiraCloudClient implements JiraClient
         return $accountId;
     }
 
+    public function worklogsForUserBetween(string $accountId, CarbonImmutable $start, CarbonImmutable $end): array
+    {
+        $issues = $this->issuesWithWorklogsInDateRange($start, $end);
+        $worklogs = [];
+
+        foreach ($issues as $issue) {
+            $embeddedWorklogs = data_get($issue, 'fields.worklog.worklogs', []);
+            $embeddedTotal = data_get($issue, 'fields.worklog.total', 0);
+
+            if (! is_array($embeddedWorklogs)) {
+                throw new JiraClientException('Jira returned an invalid worklog response.');
+            }
+
+            $issueWorklogs = is_int($embeddedTotal) && $embeddedTotal > count($embeddedWorklogs)
+                ? $this->issueWorklogs((string) ($issue['key'] ?? ''))
+                : $embeddedWorklogs;
+
+            foreach ($issueWorklogs as $worklog) {
+                if (! is_array($worklog)) {
+                    continue;
+                }
+
+                $normalized = $this->worklogFromResponse($worklog);
+
+                if ($normalized->authorAccountId === $accountId
+                    && $normalized->started->greaterThanOrEqualTo($start)
+                    && $normalized->started->lessThan($end)) {
+                    $worklogs[] = $normalized;
+                }
+            }
+        }
+
+        return $worklogs;
+    }
+
     public function activeSprint(): ?JiraActiveSprint
     {
         $boardId = $this->boardId();
@@ -135,6 +170,113 @@ final readonly class JiraCloudClient implements JiraClient
         $this->ensureSuccessful($response);
 
         return $response;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function issuesWithWorklogsInDateRange(CarbonImmutable $start, CarbonImmutable $end): array
+    {
+        $issues = [];
+        $nextPageToken = null;
+
+        do {
+            $payload = [
+                'jql' => sprintf(
+                    'worklogAuthor = currentUser() AND worklogDate >= "%s" AND worklogDate < "%s"',
+                    $start->format('Y/m/d'),
+                    $end->format('Y/m/d'),
+                ),
+                'fields' => ['worklog'],
+                'maxResults' => 100,
+            ];
+
+            if ($nextPageToken !== null) {
+                $payload['nextPageToken'] = $nextPageToken;
+            }
+
+            $response = $this->post('/rest/api/3/search/jql', $payload);
+            $page = $response->json('issues', []);
+
+            if (! is_array($page)) {
+                throw new JiraClientException('Jira returned an invalid worklog response.');
+            }
+
+            foreach ($page as $issue) {
+                if (is_array($issue) && is_string($issue['key'] ?? null)) {
+                    $issues[] = $issue;
+                }
+            }
+
+            $pageToken = $response->json('nextPageToken');
+            $nextPageToken = is_string($pageToken) && $pageToken !== '' ? $pageToken : null;
+        } while ($nextPageToken !== null);
+
+        return $issues;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function issueWorklogs(string $issueKey): array
+    {
+        if ($issueKey === '') {
+            throw new JiraClientException('Jira returned an invalid worklog response.');
+        }
+
+        $worklogs = [];
+        $startAt = 0;
+
+        do {
+            $response = $this->get('/rest/api/3/issue/'.rawurlencode($issueKey).'/worklog', [
+                'startAt' => $startAt,
+                'maxResults' => 100,
+            ]);
+            $page = $response->json('worklogs', []);
+
+            if (! is_array($page)) {
+                throw new JiraClientException('Jira returned an invalid worklog response.');
+            }
+
+            foreach ($page as $worklog) {
+                if (is_array($worklog)) {
+                    $worklogs[] = $worklog;
+                }
+            }
+
+            $startAt += count($page);
+            $total = $response->json('total', 0);
+        } while (is_int($total) && $startAt < $total && $page !== []);
+
+        return $worklogs;
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function post(string $url, array $payload): Response
+    {
+        try {
+            $response = $this->request()->post($url, $payload);
+        } catch (ConnectionException) {
+            throw new JiraClientException('Unable to connect to Jira.');
+        }
+
+        $this->ensureSuccessful($response);
+
+        return $response;
+    }
+
+    /** @param array<string, mixed> $worklog */
+    private function worklogFromResponse(array $worklog): JiraWorklog
+    {
+        $authorAccountId = data_get($worklog, 'author.accountId');
+        $timeSpentSeconds = $worklog['timeSpentSeconds'] ?? null;
+        $started = $worklog['started'] ?? null;
+
+        if (! is_string($authorAccountId) || ! is_int($timeSpentSeconds) || ! is_string($started)) {
+            throw new JiraClientException('Jira returned an invalid worklog response.');
+        }
+
+        try {
+            return new JiraWorklog($authorAccountId, $timeSpentSeconds, CarbonImmutable::parse($started));
+        } catch (\Exception) {
+            throw new JiraClientException('Jira returned an invalid worklog response.');
+        }
     }
 
     /** @param array<string, mixed> $issue */

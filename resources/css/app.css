@@ -98,6 +98,71 @@ input {
     padding: 18px;
 }
 
+.today-summary {
+    display: grid;
+    gap: 9px;
+    padding: 15px 30px;
+    border-bottom: 1px solid #e5eaf1;
+    background: #fafbfe;
+}
+
+.today-summary p {
+    margin: 0;
+    color: #718099;
+    font-size: 13px;
+}
+
+.today-summary-copy {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    color: #66748b;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.today-summary-copy strong {
+    color: #263d6c;
+    font-size: 16px;
+}
+
+.today-summary-copy strong.is-over-target {
+    color: #9a5b14;
+}
+
+.today-progress {
+    overflow: hidden;
+    height: 7px;
+    border-radius: 999px;
+    background: #e3e9f3;
+}
+
+.today-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #3d5bd8;
+    transition: width 180ms ease;
+}
+
+.today-progress span.is-over-target {
+    background: #c88a2f;
+}
+
+.today-summary-error {
+    color: #a92f43 !important;
+}
+
+.today-target-note {
+    color: #8b5b0b !important;
+    font-weight: 700;
+}
+
+.sprint-refresh-error {
+    margin-bottom: 12px;
+}
+
 .issue-groups {
     display: grid;
     gap: 12px;
@@ -736,6 +801,10 @@ input[aria-invalid="true"] {
 
     .sprint-content {
         padding: 12px;
+    }
+
+    .today-summary {
+        padding: 14px 20px;
     }
 
     .issue-group-header,

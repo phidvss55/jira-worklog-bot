@@ -14,6 +14,11 @@ interface JiraClient
 
     public function currentUserAccountId(): string;
 
+    /**
+     * @return list<JiraWorklog>
+     */
+    public function worklogsForUserBetween(string $accountId, CarbonImmutable $start, CarbonImmutable $end): array;
+
     public function activeSprint(): ?JiraActiveSprint;
 
     /**

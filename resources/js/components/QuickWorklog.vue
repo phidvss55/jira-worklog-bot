@@ -58,6 +58,7 @@ async function submit() {
         }
 
         success.value = `Logged ${formatDuration(minutes.value)} to ${props.subtask.key}.`;
+        window.dispatchEvent(new Event('worklog-created'));
     } catch {
         error.value = 'Unable to reach the application. Check your connection and try again.';
     } finally {

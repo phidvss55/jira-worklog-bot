@@ -6,6 +6,12 @@ A small single-user application for logging work to Jira Cloud from a Vue interf
 Vue + Vite → Laravel → Jira Cloud → Google Chat webhook
 ```
 
+## MVP2 Workflow
+
+After TOTP login, the application loads the active sprint and groups the user's relevant Jira subtasks beneath their parent issues. Only subtasks can be logged: Laravel verifies Jira's subtask metadata for every manual and quick worklog request before creating it.
+
+The default flow is select a subtask, select a duration, and log work. Today's Jira-backed total is shown against the 7-hour informational target and refreshes after successful worklogs.
+
 ## Stack
 
 - Laravel 12 and PHP 8.3+
@@ -31,6 +37,7 @@ Run the checks with:
 php artisan test
 npm run build
 ./vendor/bin/pint --test
+composer validate --no-check-publish
 ```
 
 ## Docker Image

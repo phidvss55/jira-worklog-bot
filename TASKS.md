@@ -135,16 +135,16 @@ Acceptance:
 
 Goal: show progress against a standard 7-hour workday.
 
-- [ ] Add Jira read support for current user's worklogs for the current product-local day.
-- [ ] Calculate total logged minutes.
-- [ ] Return normalized `totalMinutes`/equivalent data.
-- [ ] Display `Today X / 7h` summary.
-- [ ] Add compact progress visualization if consistent with DESIGN.md.
-- [ ] Refresh total after successful quick worklog.
-- [ ] Allow total above 7h.
-- [ ] Display over-7h state as informational/warning only.
-- [ ] Avoid excessive Jira API requests.
-- [ ] Add tests around date/timezone boundaries.
+- [x] Add Jira read support for current user's worklogs for the current product-local day.
+- [x] Calculate total logged minutes.
+- [x] Return normalized `totalMinutes`/equivalent data.
+- [x] Display `Today X / 7h` summary.
+- [x] Add compact progress visualization if consistent with DESIGN.md.
+- [x] Refresh total after successful quick worklog.
+- [x] Allow total above 7h.
+- [x] Display over-7h state as informational/warning only.
+- [x] Avoid excessive Jira API requests.
+- [x] Add tests around date/timezone boundaries.
 
 Acceptance:
 
@@ -155,16 +155,16 @@ Acceptance:
 # Phase 6 — MVP2 Integration & Polish
 
 - [ ] Verify existing manual worklog fallback remains usable if retained.
-- [ ] Verify all write paths enforce subtask-only rule.
-- [ ] Verify Jira success triggers Google Chat notification.
-- [ ] Verify Google Chat failure does not turn a successful Jira worklog into a failure.
-- [ ] Verify unauthenticated calls never reach Jira/Google Chat.
-- [ ] Verify TOTP login/session expiry/logout.
+- [x] Verify all write paths enforce subtask-only rule.
+- [x] Verify Jira success triggers Google Chat notification.
+- [x] Verify Google Chat failure does not turn a successful Jira worklog into a failure.
+- [x] Verify unauthenticated calls never reach Jira/Google Chat.
+- [x] Verify TOTP login/session expiry/logout.
 - [ ] Verify mobile UX.
-- [ ] Run Pint.
-- [ ] Run Composer validation.
-- [ ] Run complete Laravel tests.
-- [ ] Run Vite production build.
+- [x] Run Pint.
+- [x] Run Composer validation.
+- [x] Run complete Laravel tests.
+- [x] Run Vite production build.
 - [ ] Build Docker image.
 - [ ] Run local production smoke test.
 - [ ] Deploy to Render.
@@ -172,7 +172,7 @@ Acceptance:
 - [ ] Production E2E: subtask quick worklog.
 - [ ] Production E2E: Google Chat notification.
 - [ ] Production E2E: today's total refresh.
-- [ ] Update architecture/design documentation for final implementation differences.
+- [x] Update architecture/design documentation for final implementation differences.
 - [ ] Tag MVP2 release when complete.
 
 ---

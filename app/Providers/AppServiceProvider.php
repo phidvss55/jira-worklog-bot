@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Application\Worklog\GetTodayWorklogSummaryHandler;
 use App\Application\Worklog\WorklogNotifier;
 use App\Services\Authentication\TotpAuthenticator;
 use App\Services\GoogleChat\GoogleChatWorklogNotifier;
@@ -62,6 +63,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             WorklogDateParser::class,
             fn (): WorklogDateParser => new WorklogDateParser((string) config('app.timezone')),
+        );
+
+        $this->app->singleton(
+            GetTodayWorklogSummaryHandler::class,
+            fn (): GetTodayWorklogSummaryHandler => new GetTodayWorklogSummaryHandler(
+                jira: $this->app->make(JiraClient::class),
+                timezone: (string) config('app.timezone'),
+                targetMinutes: (int) config('worklog.daily_target_minutes'),
+            ),
         );
     }
 
