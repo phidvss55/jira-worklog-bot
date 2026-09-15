@@ -19,6 +19,10 @@ final readonly class LogWorkHandler
      */
     public function handle(LogWorkCommand $command): array
     {
+        if (! $this->jiraClient->isSubtask($command->ticket)) {
+            throw new WorklogTargetNotSubtaskException('Worklogs can only be logged against Jira sub-tasks.');
+        }
+
         $this->jiraClient->logWork(
             $command->ticket,
             $command->durationSeconds,

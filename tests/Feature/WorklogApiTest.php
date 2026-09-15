@@ -36,6 +36,7 @@ final class WorklogApiTest extends TestCase
     public function test_valid_worklog_request_is_normalized_and_sent_to_jira_client(): void
     {
         $jiraClient = Mockery::mock(JiraClient::class);
+        $jiraClient->shouldReceive('isSubtask')->once()->andReturn(true);
         $jiraClient->shouldReceive('logWork')
             ->once()
             ->withArgs(function (string $ticket, int $durationSeconds, CarbonImmutable $started): bool {
@@ -83,6 +84,9 @@ final class WorklogApiTest extends TestCase
         ]);
         Http::preventStrayRequests();
         Http::fake([
+            'jira.example.test/rest/api/3/issue/OPS-999*' => Http::response([
+                'fields' => ['issuetype' => ['subtask' => true], 'parent' => ['key' => 'OPS-1']],
+            ]),
             'jira.example.test/rest/api/3/issue/OPS-999/worklog' => Http::response([], 201),
             self::GOOGLE_CHAT_WEBHOOK_URL => Http::response([], 200),
         ]);
@@ -94,7 +98,7 @@ final class WorklogApiTest extends TestCase
             ->assertJsonPath('data.started', '2026-09-05T10:15:30+07:00')
             ->assertJsonPath('notificationSent', true);
 
-        Http::assertSentCount(2);
+        Http::assertSentCount(3);
         Http::assertSent(fn (Request $request): bool => $request->url() === self::GOOGLE_CHAT_WEBHOOK_URL
             && $request['text'] === "✅ Jira Worklog Added\n\n🎫 OPS-999\n⏱ 30m\n🕐 05/09/2026 10:15");
     }
@@ -139,6 +143,7 @@ final class WorklogApiTest extends TestCase
     public function test_jira_service_failure_returns_a_safe_error(): void
     {
         $jiraClient = Mockery::mock(JiraClient::class);
+        $jiraClient->shouldReceive('isSubtask')->once()->andReturn(true);
         $jiraClient->shouldReceive('logWork')
             ->once()
             ->andThrow(new JiraClientException('Sensitive upstream details'));
@@ -167,6 +172,7 @@ final class WorklogApiTest extends TestCase
         ]);
 
         $jiraClient = Mockery::mock(JiraClient::class);
+        $jiraClient->shouldReceive('isSubtask')->once()->andReturn(true);
         $jiraClient->shouldReceive('logWork')->once();
         $this->app->instance(JiraClient::class, $jiraClient);
 
@@ -200,6 +206,7 @@ final class WorklogApiTest extends TestCase
         Http::fake(Http::failedConnection('Operation timed out.'));
 
         $jiraClient = Mockery::mock(JiraClient::class);
+        $jiraClient->shouldReceive('isSubtask')->once()->andReturn(true);
         $jiraClient->shouldReceive('logWork')->once();
         $this->app->instance(JiraClient::class, $jiraClient);
 
@@ -217,6 +224,7 @@ final class WorklogApiTest extends TestCase
         Http::preventStrayRequests();
 
         $jiraClient = Mockery::mock(JiraClient::class);
+        $jiraClient->shouldReceive('isSubtask')->once()->andReturn(true);
         $jiraClient->shouldReceive('logWork')->once();
         $this->app->instance(JiraClient::class, $jiraClient);
 

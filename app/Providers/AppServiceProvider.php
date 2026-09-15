@@ -26,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
                 baseUrl: (string) config('services.jira.base_url'),
                 email: (string) config('services.jira.email'),
                 apiToken: (string) config('services.jira.api_token'),
+                boardId: config('services.jira.board_id') === null ? null : (int) config('services.jira.board_id'),
                 timeoutSeconds: (int) config('services.jira.timeout'),
             ),
         );

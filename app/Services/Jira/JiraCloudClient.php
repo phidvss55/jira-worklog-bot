@@ -15,6 +15,7 @@ final readonly class JiraCloudClient implements JiraClient
         private string $baseUrl,
         private string $email,
         private string $apiToken,
+        private ?int $boardId,
         private int $timeoutSeconds = 10,
     ) {}
 
@@ -35,6 +36,16 @@ final readonly class JiraCloudClient implements JiraClient
         $this->ensureSuccessful($response);
     }
 
+    public function isSubtask(string $ticket): bool
+    {
+        $response = $this->get('/rest/api/3/issue/'.rawurlencode($ticket), [
+            'fields' => 'issuetype,parent',
+        ]);
+
+        return $response->json('fields.issuetype.subtask') === true
+            && is_string($response->json('fields.parent.key'));
+    }
+
     public function checkConnection(): void
     {
         try {
@@ -44,6 +55,136 @@ final readonly class JiraCloudClient implements JiraClient
         }
 
         $this->ensureSuccessful($response);
+    }
+
+    public function currentUserAccountId(): string
+    {
+        $response = $this->get('/rest/api/3/myself');
+        $accountId = $response->json('accountId');
+
+        if (! is_string($accountId) || $accountId === '') {
+            throw new JiraClientException('Jira returned an invalid user response.');
+        }
+
+        return $accountId;
+    }
+
+    public function activeSprint(): ?JiraActiveSprint
+    {
+        $boardId = $this->boardId();
+        $response = $this->get('/rest/agile/1.0/board/'.$boardId.'/sprint', ['state' => 'active']);
+        $sprint = $response->json('values.0');
+
+        if (! is_array($sprint)) {
+            return null;
+        }
+
+        $id = $sprint['id'] ?? null;
+        $name = $sprint['name'] ?? null;
+
+        if (! is_int($id) || ! is_string($name) || $name === '') {
+            throw new JiraClientException('Jira returned an invalid active sprint response.');
+        }
+
+        return new JiraActiveSprint(
+            id: $id,
+            name: $name,
+            startDate: $this->dateValue($sprint['startDate'] ?? null),
+            endDate: $this->dateValue($sprint['endDate'] ?? null),
+        );
+    }
+
+    public function sprintIssues(int $sprintId): array
+    {
+        $issues = [];
+        $startAt = 0;
+
+        do {
+            $response = $this->get('/rest/agile/1.0/sprint/'.$sprintId.'/issue', [
+                'startAt' => $startAt,
+                'maxResults' => 100,
+                'fields' => 'summary,status,issuetype,assignee,parent',
+            ]);
+            $page = $response->json('issues', []);
+
+            if (! is_array($page)) {
+                throw new JiraClientException('Jira returned an invalid sprint issue response.');
+            }
+
+            foreach ($page as $issue) {
+                if (is_array($issue)) {
+                    $issues[] = $this->issueFromResponse($issue);
+                }
+            }
+
+            $startAt += count($page);
+            $total = $response->json('total', 0);
+        } while (is_int($total) && $startAt < $total && $page !== []);
+
+        return $issues;
+    }
+
+    private function get(string $url, array $query = []): Response
+    {
+        try {
+            $response = $this->request()->get($url, $query);
+        } catch (ConnectionException $exception) {
+            throw new JiraClientException('Unable to connect to Jira.');
+        }
+
+        $this->ensureSuccessful($response);
+
+        return $response;
+    }
+
+    /** @param array<string, mixed> $issue */
+    private function issueFromResponse(array $issue): JiraIssue
+    {
+        $key = $issue['key'] ?? null;
+        $fields = $issue['fields'] ?? null;
+        $summary = is_array($fields) ? $fields['summary'] ?? null : null;
+        $status = is_array($fields) ? data_get($fields, 'status.name') : null;
+        $issueType = is_array($fields) ? data_get($fields, 'issuetype.name') : null;
+
+        if (! is_string($key) || ! is_string($summary) || ! is_string($status) || ! is_string($issueType)) {
+            throw new JiraClientException('Jira returned an invalid sprint issue response.');
+        }
+
+        $assigneeAccountId = is_array($fields) ? data_get($fields, 'assignee.accountId') : null;
+        $parentKey = is_array($fields) ? data_get($fields, 'parent.key') : null;
+        $subtask = is_array($fields) && data_get($fields, 'issuetype.subtask') === true;
+
+        return new JiraIssue(
+            key: $key,
+            summary: $summary,
+            status: $status,
+            issueType: $issueType,
+            subtask: $subtask,
+            assigneeAccountId: is_string($assigneeAccountId) ? $assigneeAccountId : null,
+            parentKey: is_string($parentKey) ? $parentKey : null,
+        );
+    }
+
+    private function boardId(): int
+    {
+        if ($this->boardId === null || $this->boardId <= 0) {
+            throw new JiraClientException('Jira board configuration is incomplete.');
+        }
+
+        return $this->boardId;
+    }
+
+    private function dateValue(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($value)->toDateString();
+        } catch (\Exception) {
+            throw new JiraClientException('Jira returned an invalid active sprint response.');
+        }
     }
 
     private function request(): PendingRequest

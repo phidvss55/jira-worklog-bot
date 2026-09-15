@@ -1,418 +1,215 @@
-# Architecture
+# MVP2 Architecture
 
-## 1. Overview
+## Goal
 
-Jira Worklog Bot is a personal web application for logging work to Jira Cloud.
+MVP2 optimizes Jira work logging for a single user by minimizing keyboard input. The application lists the user's work in the active sprint, groups subtasks under their parent Jira issues, and allows worklogs to be created from subtasks only.
 
-A single user signs in with a six-digit authenticator code, submits a small Vue form, and Laravel creates the Jira worklog. After Jira succeeds, Laravel attempts to send a best-effort notification to a Google Chat space through an incoming webhook.
+## Core Business Rule
 
-The application remains intentionally small and single-user.
+Worklogs MUST only be created against Jira subtasks.
 
-## 2. System Context
+Parent issues are display/grouping context only. They are never selectable worklog targets and the backend must reject attempts to quick-log against a non-subtask even if the frontend is bypassed.
 
-```text
-┌────────────────────────────┐
-│          Browser           │
-│      Vue + Vite UI         │
-└─────────────┬──────────────┘
-              │ authenticated session / HTTPS
-              ▼
-┌────────────────────────────┐
-│          Laravel           │
-│      Render / Docker       │
-└─────────────┬──────────────┘
-              │ Jira REST API
-              ▼
-┌────────────────────────────┐
-│         Jira Cloud         │
-│          Worklogs          │
-└─────────────┬──────────────┘
-              │ success
-              ▼
-┌────────────────────────────┐
-│ Google Chat Incoming Hook  │
-│   best-effort notification │
-└────────────────────────────┘
-```
+## System Flow
 
-Laravel is the trusted boundary. Jira and Google Chat credentials never reach the browser.
+Browser / Vue UI
+-> Laravel authenticated API
+-> Jira read API (active sprint, current user, issues/subtasks)
+-> normalized sprint view model
+-> user selects a subtask
+-> quick duration picker
+-> existing worklog application flow
+-> Jira worklog creation
+-> Google Chat webhook notification on Jira success
 
-## 3. Architectural Goals
+## Existing Components to Preserve
 
-The architecture should be:
+- TOTP authentication and Laravel session protection
+- Existing POST /api/worklogs behavior where still needed for manual/internal compatibility
+- Jira client authentication/configuration
+- Google Chat notifier and failure semantics
+- Docker/Render deployment
+- No database
 
-- simple
-- secure for a publicly deployed single-user tool
-- easy to test
-- inexpensive to host
-- easy to understand
-- isolated from external integrations
-- independent of application database state
+## Read Side
 
-This application does not require enterprise architecture.
+Introduce a sprint/application read use case that returns UI-oriented data rather than raw Jira payloads.
 
-## 4. Deployment
+Suggested components:
 
-Target deployment:
+- Application/Sprint/GetActiveSprintHandler
+- Application/Sprint DTOs/value objects as needed
+- Http/Controllers/SprintController
+- Jira read methods behind the existing Jira integration boundary
 
-```text
-Developer
-    │ git push
-    ▼
-GitHub
-    │
-    ▼
-Render
-    │ build Dockerfile
-    │ install PHP/JS dependencies
-    │ compile Vite assets
-    ▼
-Laravel Container
-```
+Suggested endpoint:
 
-Target hosting is a Render Web Service for development and personal usage.
+- GET /api/sprint
 
-The application must not depend on persistent local filesystem state. Environment variables provide deployment-specific configuration and secrets.
+The endpoint must be protected by the existing TOTP session middleware.
 
-## 5. Layers
+## Sprint Resolution
 
-Use three conceptual layers.
+The implementation should determine the active sprint relevant to the configured Jira board/project. Board/project identifiers should be runtime configuration rather than frontend constants.
 
-### Presentation / HTTP Layer
+Expected configuration may include values such as:
 
-Responsibilities:
+- JIRA_BOARD_ID
+- JIRA_PROJECT_KEY (only if needed by the selected Jira API strategy)
 
-- render the Blade/Vue entry point
-- present the login and worklog forms
-- validate HTTP request shape
-- enforce session authentication and CSRF protection
-- translate requests into application commands
-- format safe JSON responses
+Do not expose Jira credentials or unnecessary Jira metadata to Vue.
 
-Examples:
+## Issue Selection Rules
 
-```text
-Vue components
-Authentication controller/middleware
-StoreWorklogRequest
-WorklogController
-```
+The UI should show parent issues when they provide context for at least one relevant subtask.
 
-This layer must not contain Jira or Google Chat HTTP implementation details.
+A subtask is relevant when it belongs to the active sprint context and is assigned to the authenticated Jira account/current user according to the Jira query strategy.
 
-### Application Layer
+Parent issues may be assigned to another person. They should still be shown if they contain at least one relevant subtask assigned to the current user.
 
-Coordinates the `LogWork` use case.
+Only relevant subtasks are selectable.
 
-```text
-WorklogController
-    ↓
-LogWorkCommand
-    ↓
-LogWorkHandler
-    ├── JiraClient
-    └── GoogleChatNotifier after Jira success
-```
+## Normalized API Shape
 
-The handler owns operation ordering and the distinction between the primary Jira operation and secondary notification.
+Conceptual response:
 
-### Integration / Service Layer
+{
+"sprint": {
+"id": 123,
+"name": "Sprint 24",
+"startDate": "2026-09-09",
+"endDate": "2026-09-22"
+},
+"issues": [
+{
+"key": "BKM4-1201",
+"summary": "DSOP Action Validation",
+"status": "In Progress",
+"subtasks": [
+{
+"key": "BKM4-1234",
+"summary": "Implement validation",
+"status": "In Progress",
+"issueType": "Sub-task"
+}
+]
+}
+]
+}
 
-Handles external systems and reusable parsing utilities.
+The frontend must not depend on Jira's raw REST response shape.
 
-```text
-JiraClient
-GoogleChatNotifier
-DurationParser
-WorklogDateParser
-```
+## Quick Worklog
 
-Jira-specific HTTP calls belong only in the Jira integration. Google Chat webhook payload and delivery logic belong only in the Google Chat notifier.
+Quick logging must reuse the existing worklog application use case rather than create a parallel Jira-writing implementation.
 
-## 6. Application Flow
+The quick-log path must enforce the subtask-only rule server-side. Prefer a dedicated application validation/boundary that confirms the selected Jira issue is a subtask before the write is executed.
 
-The canonical flow is:
+Do not trust a frontend `issueType` value as proof that an issue is a subtask.
 
-```text
-Authenticated Vue form
-  │
-  ├── ticket
-  ├── duration
-  ├── optional date
-  └── optional time
-  │
-  ▼
-POST /api/worklogs
-  │
-  ▼
-Server-side validation
-  │
-  ├── normalize ticket
-  ├── parse duration to seconds
-  └── parse started time in configured timezone
-  │
-  ▼
-LogWorkCommand
-  │
-  ▼
-LogWorkHandler
-  │
-  ▼
-JiraClient
-  │
-  ├── failure ──> safe error response
-  │
-  └── success
-        │
-        ▼
-  GoogleChatNotifier
-        │
-        ├── success ──> notificationSent = true
-        └── failure ──> log warning, notificationSent = false
-                         │
-                         ▼
-                    successful UI response
-```
+## Duration Rules
 
-The application must never create a second Jira worklog merely to retry a failed notification.
+Quick picker rules:
 
-## 7. Project Structure
+- minimum: 15 minutes
+- maximum per quick worklog: 7 hours / 420 minutes
+- increment/decrement step: 15 minutes
 
-Target structure:
+Frontend should represent selection internally as integer minutes.
 
-```text
-app/
-├── Application/
-│   └── Worklog/
-│       ├── LogWorkCommand.php
-│       └── LogWorkHandler.php
-├── Http/
-│   ├── Controllers/
-│   │   ├── AuthenticationController.php
-│   │   └── WorklogController.php
-│   ├── Middleware/
-│   │   └── RequirePersonalAccess.php
-│   └── Requests/
-│       ├── LoginRequest.php
-│       └── StoreWorklogRequest.php
-├── Services/
-│   ├── Jira/
-│   │   └── JiraClient.php
-│   └── GoogleChat/
-│       └── GoogleChatNotifier.php
-└── Support/
-    ├── DurationParser.php
-    └── WorklogDateParser.php
+Common presets:
 
-resources/
-├── css/
-│   └── app.css
-├── js/
-│   ├── app.js
-│   ├── App.vue
-│   └── components/
-│       ├── LoginForm.vue
-│       └── WorklogForm.vue
-└── views/
-    └── app.blade.php
-```
+- 15m
+- 30m
+- 45m
+- 1h
+- 1h30m
+- 2h
+- 3h
+- 4h
+- 5h
+- 6h
+- 7h
 
-Names may follow Laravel conventions discovered during implementation. Create only the components needed by the current phase.
+Other quarter-hour values are reached using +/- 15m.
 
-The former `GoogleChatCommandParser`, `ParsedGoogleChatCommand`, `InvalidGoogleChatCommandException`, and `GoogleChatResponseBuilder` belong to the abandoned inbound slash-command design and should be removed during the Vue UI phase.
+The 7-hour value is a quick-worklog maximum and standard-day UX target. It is not a rule that daily accumulated Jira worklogs can never exceed 7 hours.
 
-## 8. Worklog Model
+## Today's Summary
 
-A worklog operation consists conceptually of:
-
-```text
-ticket
-duration
-durationSeconds
-started
-```
+MVP2 should display today's logged time for the current Jira user and a 7-hour target.
 
 Example:
 
-```text
-ticket          = BKM4-1234
-duration         = 2h15m
-durationSeconds  = 8100
-started          = 2026-09-05T14:30:00+07:00
-```
+- 5h 30m / 7h
 
-No database model is required.
+Going above 7 hours should be displayed as an informational/warning state, not blocked.
 
-## 9. Duration, Date, and Time
+Today's summary must refresh after a successful worklog.
 
-Supported duration grammar:
+## Frontend Architecture
 
-```text
-<hours>h
-<minutes>m
-<hours>h<minutes>m
-```
+Keep Vue small and local-state driven. Do not add Pinia/Vuex unless future requirements justify it.
 
-Duration must be greater than zero and is normalized to seconds.
+Suggested conceptual components:
 
-Timezone:
+- SprintHeader
+- IssueGroup
+- SubtaskItem
+- QuickWorklog
+- DurationPicker
+- TodaySummary
+- ManualWorklog fallback if retained
 
-```text
-Asia/Ho_Chi_Minh
-```
+Parent IssueGroup components are not selectable for logging.
 
-Supported input modes:
+## Security
 
-- no explicit date/time: use the current configured date/time
-- time only: use today at the supplied time
-- explicit date and time: use the supplied values
+All MVP2 APIs are protected by the existing TOTP session authentication except public health/login routes.
 
-The Vue UI may prefill date and time for convenience, but Laravel remains authoritative. Never infer time from the server/container timezone.
+Unauthenticated requests must never reach Jira or Google Chat.
 
-## 10. Jira Integration
+CSRF/session behavior from MVP1 must remain intact.
 
-Jira Cloud is the system of record for worklogs.
+## Error Handling
 
-Conceptual request:
+Handle at least:
 
-```text
-POST /rest/api/3/issue/{issueKey}/worklog
-```
+- no active sprint
+- no assigned subtasks
+- Jira authentication/permission errors
+- Jira rate limiting
+- Jira unavailable
+- selected issue is not a subtask
+- worklog failure
+- session expiry
 
-Conceptual payload:
+Do not expose Jira tokens, Google Chat webhook URL, TOTP secret, or raw sensitive upstream errors.
 
-```json
-{
-  "started": "...",
-  "timeSpentSeconds": 8100
-}
-```
+## Non-Goals
 
-Credentials are supplied through `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN`. The exact HTTP implementation belongs in `JiraClient`.
+MVP2 does not include:
 
-## 11. Google Chat Notification
+- logging work on parent issues
+- creating/editing Jira issues
+- changing status
+- comments
+- sprint administration
+- board administration
+- drag and drop
+- multi-user support
+- database persistence
+- edit/delete worklogs
+- cloning Jira's board UI
 
-Google Chat is not an input adapter. The current architecture does not include a Chat app, slash commands, Google request verification, or OAuth.
+## MVP2 Completion Flow
 
-After Jira creates a worklog, `GoogleChatNotifier` posts a concise message to the configured incoming webhook.
-
-```text
-✅ Jira Worklog Added
-
-🎫 BKM4-1234
-⏱ 2h 15m
-🕐 05/09/2026 14:30
-```
-
-The webhook URL comes from `config('services.google_chat.webhook_url')` backed by `GOOGLE_CHAT_WEBHOOK_URL`.
-
-### Failure Semantics
-
-```text
-Jira failure
-    └── worklog request fails; do not notify
-
-Jira success + webhook success
-    └── worklog request succeeds; notificationSent = true
-
-Jira success + webhook failure
-    └── worklog request succeeds; notificationSent = false; log safe warning
-```
-
-Do not rollback Jira, retry by recreating the worklog, or expose the webhook URL.
-
-## 12. Authentication and Security
-
-The Render URL will be public, but the application is private to one user.
-
-Use a minimal TOTP login backed by a configured server-side secret and Laravel session. Protect both the Vue page and worklog API. Use Laravel CSRF protection, secure HTTP-only cookies in production, session regeneration on login/logout, and rate limiting on login attempts.
-
-TOTP uses six digits, a 30-second period, SHA-1, and accepts only the previous, current, or next period. The MVP does not persist used time steps, so it does not prevent reuse of a valid code within that short window.
-
-No users table is required. Do not add registration, password reset, email verification, OAuth, or Google identity.
-
-Authentication must be implemented and verified before Render deployment.
-
-Secrets include:
-
-- Jira API token
-- Google Chat webhook URL
-- TOTP secret
-- Laravel application key
-
-Never expose these in browser bundles, logs, API responses, repository files, or Docker image layers.
-
-## 13. Persistence
-
-No application database is required. Jira remains the source of truth.
-
-Do not introduce MySQL, PostgreSQL, SQLite, Redis, or persistent worklog history unless a future requirement explicitly requires it. Session storage must use a deployment-compatible non-database driver for the single-instance MVP.
-
-Production uses file-backed sessions. A container restart or redeploy may log the user out, and horizontal scaling would require shared session storage in a future architecture.
-
-## 14. Error Handling
-
-Convert failures into concise application-friendly responses.
-
-Examples:
-
-- invalid ticket, duration, date, or time
-- unauthenticated or rate-limited access
-- Jira authentication, authorization, validation, timeout, or network failure
-- Google Chat notification unavailable or failed
-
-Do not expose tokens, credentials, sensitive headers, webhook URLs, or unnecessary external stack traces.
-
-## 15. Testing Strategy
-
-### Unit Tests
-
-Test pure behavior including duration parsing, date/time parsing, notification formatting, and authentication helpers when applicable.
-
-### Feature Tests
-
-Test:
-
-- authenticated and guest page/API access
-- login, logout, invalid authenticator code, and rate limiting
-- `POST /api/worklogs` with Jira mocked
-- Google Chat webhook success and failure with HTTP mocked
-- Jira success remains successful when notification fails
-- external secrets are not returned
-
-### Frontend Verification
-
-Verify the Vite production build and the form's loading, validation, success, notification-warning, and Jira-error states.
-
-Real Jira and Google Chat calls are manual integration tests and must not run in the normal automated test suite.
-
-## 16. Explicit Non-Goals
-
-For the current product:
-
-- no database
-- no multi-user support
-- no user registration or recovery
-- no Jira OAuth
-- no Google Chat app or slash commands
-- no Google OAuth
-- no Vue Router or Pinia
-- no general dashboard
-- no worklog history storage
-- no queues or Redis
-- no scheduler
-- no microservices
-- no DDD aggregates or event sourcing
-
-## 17. Architectural Principle
-
-The central rule is:
-
-```text
-Vue and HTTP are inputs.
-Jira worklog creation is the primary output.
-Google Chat notification is a secondary output.
-LogWork remains the application use case.
-```
-
-Changing the presentation or notification channel must not require rewriting Jira integration or core parsing behavior.
+TOTP login
+-> active sprint loads
+-> parent issues group the user's subtasks
+-> select subtask
+-> choose duration with presets or +/- 15m
+-> log work
+-> Jira succeeds
+-> Google Chat notification succeeds or safely fails as secondary side effect
+-> today's total refreshes

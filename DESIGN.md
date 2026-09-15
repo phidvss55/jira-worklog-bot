@@ -1,293 +1,192 @@
-# Product Design
-
-## 1. Product Goal
-
-Provide a fast, secure web interface for one user to log working time into Jira and receive a confirmation in Google Chat.
-
-The primary design goal is:
-
-> A normal daily worklog should require only a ticket, a duration, and one submit action.
-
-## 2. Primary Experience
-
-```text
-Open application
-    ↓
-Sign in when the session is absent
-    ↓
-Enter ticket and duration
-    ↓
-Optionally adjust date and time
-    ↓
-Select Log Work
-    ↓
-Jira worklog created
-    ↓
-UI confirmation + Google Chat notification attempt
-```
-
-The MVP is a small Laravel + Vue application, not a dashboard. It does not require Vue Router, Pinia, or a UI component framework.
-
-## 3. Authentication Experience
-
-When no authenticated session exists, show a minimal authenticator-code screen.
-
-```text
-┌─────────────────────────────────────┐
-│ Jira Worklog                        │
-│                                     │
-│ Authenticator code                  │
-│ ┌─────────────────────────────────┐ │
-│ │ 123456                          │ │
-│ └─────────────────────────────────┘ │
-│                                     │
-│              [ Sign in ]            │
-└─────────────────────────────────────┘
-```
-
-Requirements:
-
-- do not reveal whether configuration or TOTP details are wrong
-- disable the submit button and show progress while signing in
-- show a concise error for rejected or rate-limited attempts
-- never store the TOTP code or secret in local storage
-- provide a simple logout action after authentication
-
-No registration, password reset, profile, account management, or Google login is needed.
-
-## 4. Worklog Form
-
-The authenticated page contains one primary form.
-
-```text
-┌─────────────────────────────────────────┐
-│ Jira Worklog                    Log out │
-│ Log your working time to Jira          │
-│                                         │
-│ Jira Ticket                             │
-│ ┌─────────────────────────────────────┐ │
-│ │ BKM4-1234                           │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ Duration                                │
-│ ┌─────────────────────────────────────┐ │
-│ │ 2h15m                               │ │
-│ └─────────────────────────────────────┘ │
-│ Examples: 30m, 1h, 1h30m, 2h15m       │
-│                                         │
-│ Date                     Start time     │
-│ ┌───────────────────┐   ┌─────────────┐ │
-│ │ 05/09/2026        │   │ 14:30       │ │
-│ └───────────────────┘   └─────────────┘ │
-│                                         │
-│              [ Log Work ]               │
-│                                         │
-│ ✓ Worklog added                         │
-│   BKM4-1234 · 2h 15m · 14:30            │
-└─────────────────────────────────────────┘
-```
+# MVP2 Product Design
 
-The layout must remain usable on mobile and desktop. On narrow screens, date and time may stack vertically.
+## Product Goal
 
-## 5. Field Behavior
+Reduce daily Jira work logging to a few clicks with almost no keyboard usage.
 
-### Jira Ticket
+## Primary Rule
 
-Required. Accept normal Jira issue-key format such as:
+Only Jira subtasks can receive worklogs from this product.
 
-```text
-BKM4-1234
-ABC-10
-OPS-999
-```
+Parent tasks/stories/bugs are shown only to organize and explain their subtasks. They must not have a Log Work action.
 
-Normalize lowercase input to uppercase. Jira remains responsible for determining whether the ticket exists and is accessible.
+## Main Screen
 
-### Duration
+After TOTP login, the default screen shows:
 
-Required. Supported examples:
+- application title
+- active sprint name/date range
+- today's logged-time summary
+- parent Jira issues as minimal groups/cards
+- relevant assigned subtasks nested under each parent
+- refresh action
+- graceful loading/empty/error states
 
-```text
-15m
-30m
-45m
-1h
-2h
-8h
-1h15m
-1h30m
-2h15m
-7h30m
-```
+Do not recreate Jira board columns. The screen is optimized for work logging, not sprint management.
 
-Whitespace inside a duration is not supported. Duration must be greater than zero.
+## Parent Issue Presentation
 
-### Date and Time
+Parent issue displays:
 
-Default date to today and time to the current time in the configured application timezone. The user may adjust either value before submitting.
+- key
+- summary
+- small status indicator if useful
 
-All values are interpreted in `Asia/Ho_Chi_Minh` unless application configuration overrides it. Browser display must not change the server-side interpretation.
+Parent issue is not clickable/selectable for work logging.
 
-Client-side validation may give immediate feedback, but Laravel validation and parsers are authoritative.
+A parent should appear if it contains at least one relevant subtask for the current user, even if the parent itself is assigned to someone else.
 
-## 6. Submission Behavior
+## Subtask Presentation
 
-On submit:
+Each subtask displays:
 
-1. Prevent duplicate submissions.
-2. Disable the primary action and show a clear loading label.
-3. Send the form to `POST /api/worklogs` using the authenticated session and CSRF protection.
-4. Display server validation beside the relevant field where possible.
-5. Preserve the entered values after a failure so they can be corrected.
-6. Display success only after Jira confirms creation.
+- key
+- summary
+- status
+- optional today's logged time if available without excessive Jira requests
 
-The MVP does not require a confirmation dialog before a valid submission.
+Subtasks are the only selectable worklog targets.
 
-## 7. Success States
+Selecting a subtask opens/expands the quick-worklog controls inline where practical. Prefer inline expansion over a heavy modal.
 
-### Jira and Notification Succeeded
+## Quick Duration Picker
 
-```text
-✓ Worklog added
-BKM4-1234 · 2h 15m · 05/09/2026 14:30
-Google Chat notified.
-```
+Selected duration is represented in 15-minute increments.
 
-### Jira Succeeded but Notification Failed
+Constraints:
 
-```text
-✓ Worklog added
-BKM4-1234 · 2h 15m · 05/09/2026 14:30
-Google Chat notification could not be sent.
-```
+- min: 15m
+- max: 7h
+- step: 15m
 
-The second state is still a success. It must not invite the user to submit the worklog again because doing so could create a duplicate Jira worklog.
+Controls:
 
-## 8. Failure States
+- -15m
+- current duration display
+- +15m
 
-### Invalid Input
+Presets:
 
-Use concise field-level messages, for example:
+- 15m
+- 30m
+- 45m
+- 1h
+- 1h30m
+- 2h
+- 3h
+- 4h
+- 5h
+- 6h
+- 7h
 
-```text
-Enter a ticket such as BKM4-1234.
-Enter a duration such as 30m, 1h, or 2h15m.
-Enter a valid date.
-Enter a valid time.
-```
+Do not display every possible 15-minute value as a preset. Use +/- for intermediate values such as 1h15m, 1h45m, 2h15m, etc.
 
-### Jira Rejection
+The Log button should include the selected duration, e.g.:
 
-```text
-Unable to log work
-BKM4-1234 was not found, is not accessible, or Jira rejected the worklog.
-```
+- Log 1h 30m
 
-Use a more specific reason only when Jira provides one that is safe and useful. Never expose credentials, authorization headers, raw webhook URLs, or internal stack traces.
+Prevent double submission while a worklog is pending.
 
-### Session Expired
+## Date and Start Time
 
-Return the user to the authenticator-code screen with a concise message. Preserve worklog input in memory when practical, but do not store sensitive authentication data.
+For the normal quick-log path, default to today/current configured product time according to existing worklog behavior.
 
-## 9. API Contract
+Avoid requiring keyboard input for date/time during normal daily use.
 
-Request:
+If MVP1 manual logging remains available, it can be used for exceptional historical/custom date/time worklogs.
 
-```http
-POST /api/worklogs
-```
+## Today's Summary
 
-```json
-{
-  "ticket": "BKM4-1234",
-  "duration": "2h15m",
-  "date": "05/09/2026",
-  "time": "14:30"
-}
-```
+Show a compact daily total near the top of the page:
 
-Successful response:
+- Today 5h 30m / 7h
 
-```json
-{
-  "success": true,
-  "data": {
-    "ticket": "BKM4-1234",
-    "duration": "2h15m",
-    "durationSeconds": 8100,
-    "started": "2026-09-05T14:30:00+07:00"
-  },
-  "notificationSent": true
-}
-```
+7h is the standard-day target.
 
-If Jira succeeds and the notification fails, return the same successful worklog data with `notificationSent: false`.
+Do not block totals above 7h. Show a subtle warning/over-target state instead.
 
-The API must reject unauthenticated requests. It must never expose Jira credentials, the TOTP secret, or the Google Chat webhook URL.
+Refresh the summary after a successful worklog.
 
-## 10. Google Chat Notification
+## Success Behavior
 
-After Jira succeeds, send a concise incoming-webhook message:
+After successful Jira worklog creation:
 
-```text
-✅ Jira Worklog Added
+- show concise success feedback
+- keep user on the sprint screen
+- update today's total
+- optionally update the selected subtask's displayed logged-today value
+- Google Chat notification continues as a secondary side effect
 
-🎫 BKM4-1234
-⏱ 2h 15m
-🕐 05/09/2026 14:30
-```
+Do not force a full-page reload unless necessary.
 
-Google Chat is notification-only. The product no longer supports entering `/log` commands in Google Chat.
+## Error Behavior
 
-## 11. Accessibility and Usability
+Use concise safe messages for:
 
-- every input has a visible label
-- keyboard submission and logical focus order work
-- loading and result messages are understandable without relying only on color
-- validation errors are associated with their fields
-- primary controls have usable touch targets
-- the page remains readable at common mobile widths
+- Jira unavailable
+- Jira permission/authentication issue
+- issue no longer available
+- issue is not a subtask
+- invalid duration
+- session expired
 
-## 12. Product Constraints
+If session expires, route the user back to login.
 
-The MVP intentionally avoids:
+## Empty States
 
-- multi-user accounts
-- registration and password recovery
-- database-backed profiles or sessions
-- Jira account selection
-- worklog history storage
-- a general dashboard
-- Vue Router, Pinia, and UI frameworks
-- Google Chat slash commands or an interactive Chat app
-- Google OAuth
-- worklog editing, deletion, and undo
-- comments/descriptions
+No active sprint:
 
-## 13. Design Principle
+- "No active sprint found."
 
-Optimize for:
+Active sprint but no relevant subtasks:
 
-```text
-minimum input
-+
-predictable behavior
-+
-clear confirmation
-+
-no accidental duplicate worklogs
-```
+- "No subtasks assigned to you in the active sprint."
 
-The normal daily workflow should remain:
+## Responsive Behavior
 
-```text
-ticket + duration
-        ↓
-select Log Work
-        ↓
-Jira worklog created
-        ↓
-UI confirmation
-        ↓
-best-effort Google Chat notification
-```
+Desktop and mobile must both be usable.
+
+On narrow screens:
+
+- stack metadata naturally
+- keep duration buttons large enough to tap
+- avoid horizontal board layouts
+- keep primary Log action obvious
+
+## Keyboard-Minimization Principle
+
+Normal flow target:
+
+1. Open app
+2. Tap subtask
+3. Tap duration preset (or +/-)
+4. Tap Log
+
+No ticket key typing should be required for active-sprint work.
+
+## Manual Log Fallback
+
+Retain the existing manual worklog UI as a secondary/fallback path if current documentation/product direction still requires it.
+
+It must not undermine the company rule: if the rule applies globally, manual logging must also reject non-subtask Jira issues server-side.
+
+## Visual Direction
+
+Minimal, functional, calm.
+
+Prioritize:
+
+- whitespace
+- readable issue hierarchy
+- clear selected state
+- compact status labels
+- obvious duration controls
+- minimal decorative UI
+
+Avoid:
+
+- Jira clone styling
+- kanban columns
+- dashboards full of metrics
+- complex navigation
+- unnecessary animations

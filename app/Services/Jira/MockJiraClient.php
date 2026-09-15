@@ -11,8 +11,28 @@ final class MockJiraClient implements JiraClient
         // Phase 1 deliberately performs no external request.
     }
 
+    public function isSubtask(string $ticket): bool
+    {
+        return true;
+    }
+
     public function checkConnection(): void
     {
         // Phase 1 deliberately performs no external request.
+    }
+
+    public function currentUserAccountId(): string
+    {
+        return 'mock-account-id';
+    }
+
+    public function activeSprint(): ?JiraActiveSprint
+    {
+        return null;
+    }
+
+    public function sprintIssues(int $sprintId): array
+    {
+        return [];
     }
 }

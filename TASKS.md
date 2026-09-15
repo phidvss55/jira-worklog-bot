@@ -1,293 +1,206 @@
-# Implementation Tasks
+# MVP2 Tasks — Active Sprint Quick Worklog
 
 ## Status Legend
 
-```text
-[ ] Not started
-[x] Completed
-[-] In progress
-[~] Superseded; remove during the indicated phase
-```
+- [ ] Not started
+- [-] In progress
+- [x] Completed
+
+## MVP2 Business Rule
+
+All worklogs created by this application must target Jira subtasks only.
+
+Parent issues are display/grouping context and must never be valid worklog targets.
 
 ---
 
-# Phase 1 — Laravel Core
+# Phase 1 — Jira Active Sprint Read API
 
-Goal: Build and test the core Laravel worklog flow without real Jira credentials.
+Goal: return a normalized view of the current user's relevant subtasks in the active sprint.
 
-[x] Create the Laravel 12+ project.
+- [x] Inspect Jira board/sprint APIs supported by the current Jira Cloud integration.
+- [x] Add runtime configuration for board/project identification where required.
+- [x] Resolve current Jira user/account through the existing authenticated Jira client.
+- [x] Fetch the relevant active sprint.
+- [x] Fetch sprint issues required to discover the current user's subtasks.
+- [x] Include a parent issue when it contains at least one relevant subtask assigned to the current user.
+- [x] Return only relevant/selectable subtasks to the quick-log UI.
+- [x] Normalize Jira responses into application DTOs; do not expose raw Jira payloads.
+- [x] Implement protected `GET /api/sprint` (or the endpoint defined by the final implementation).
+- [x] Handle no-active-sprint state.
+- [x] Handle active sprint with no relevant subtasks.
+- [x] Handle Jira 401/403/404/429/5xx and connection failures safely.
+- [x] Add HTTP-fake/unit/feature tests.
+- [x] Confirm unauthenticated calls cannot reach Jira.
 
-[x] Configure `Asia/Ho_Chi_Minh` as the application timezone.
+Acceptance:
 
-[x] Add the `GET /health` endpoint.
-
-[x] Implement and test `DurationParser`.
-
-[x] Implement and test `WorklogDateParser`.
-
-[x] Implement `LogWorkCommand` and `LogWorkHandler`.
-
-[x] Implement `POST /api/worklogs` with request validation and ticket normalization.
-
-[x] Create a fake Jira implementation and feature-test the complete core flow.
-
----
-
-# Phase 2 — Jira Cloud Integration
-
-Goal: Replace the fake boundary with real Jira Cloud HTTP communication while keeping automated tests isolated.
-
-[ ] Create a Jira API token manually.
-
-[x] Configure `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` through Laravel configuration.
-
-[x] Update `.env.example` without real credentials.
-
-[x] Implement Jira worklog creation through the dedicated Jira client.
-
-[x] Send issue key, `timeSpentSeconds`, and `started`.
-
-[x] Safely handle success, not found, unauthorized, forbidden, validation, network, and timeout responses.
-
-[x] Add mocked Jira HTTP tests and verify secrets are not exposed.
-
-[ ] Manually test against one real Jira issue.
+- Authenticated request returns active sprint + grouped parent issues + current user's relevant subtasks.
+- Parent issues are context only.
 
 ---
 
-# Superseded Direction — Google Chat Command Input
+# Phase 2 — Enforce Subtask-Only Worklogs
 
-The previous Phase 3 implemented Google Chat `/log` parsing before the product direction changed.
+Goal: make the company rule a backend invariant, not merely a UI restriction.
 
-[x] Remove `GoogleChatCommandParser`.
+- [x] Identify the cleanest boundary for verifying that a Jira issue is a subtask before creating a worklog.
+- [x] Reuse Jira issue metadata/read capabilities where possible.
+- [x] Reject attempts to log work against Story/Task/Bug/Epic/other non-subtask issue types.
+- [x] Ensure quick-log requests cannot trust a frontend-provided issue type.
+- [x] Decide/document whether the existing manual worklog path is also subject to the same rule; default to enforcing the company rule globally.
+- [x] Ensure rejected non-subtask requests do not create Jira worklogs.
+- [x] Ensure rejected non-subtask requests do not send Google Chat notifications.
+- [x] Add tests for valid subtask and invalid parent/non-subtask targets.
 
-[x] Remove `ParsedGoogleChatCommand`.
+Acceptance:
 
-[x] Remove `InvalidGoogleChatCommandException`.
-
-[x] Remove `GoogleChatResponseBuilder`.
-
-[x] Remove their obsolete unit tests and configuration.
-
-Do not implement a Google Chat app, slash-command endpoint, Google request verification, or Google OAuth. Google Chat is now an outgoing notification only.
-
----
-
-# Phase 3 — Vue UI and Personal Access
-
-Current target.
-
-Goal: Replace command-based input with a small authenticated Vue UI that uses the existing worklog API and application flow.
-
-## Documentation and Cleanup
-
-[x] Update `AGENTS.md`, `ARCHITECTURE.md`, `DESIGN.md`, and `TASKS.md` for the new direction.
-
-[x] Remove the superseded Google Chat command parser, response builder, related DTO/exception, tests, and unused configuration.
-
-## Vue and Vite
-
-[x] Add Vue 3 and the Vue Vite plugin using the existing Laravel Vite setup.
-
-[x] Create the Blade entry point and mount one Vue application.
-
-[x] Create a focused login screen and worklog form component.
-
-[x] Do not add Vue Router, Pinia, or a UI framework.
-
-[x] Add responsive styling for mobile and desktop.
-
-## Worklog Form
-
-[x] Implement required ticket and duration inputs.
-
-[x] Implement date and time inputs defaulted in the configured application timezone.
-
-[x] Normalize ticket input to uppercase without duplicating authoritative server validation.
-
-[x] Submit to the existing `POST /api/worklogs` endpoint.
-
-[x] Implement loading state and duplicate-submit prevention.
-
-[x] Implement field validation, Jira error, success, notification-warning, and session-expired states.
-
-[x] Preserve form values after a failed submission.
-
-## Personal Session Authentication
-
-[x] Add a server-configured `WORKLOG_TOTP_SECRET` placeholder to `.env.example`.
-
-[x] Implement a minimal login endpoint and screen using the configured TOTP secret.
-
-[x] Verify six-digit TOTP codes with a 30-second period and one-period clock drift.
-
-[x] Add `worklog:totp-setup` to generate a secret and authenticator provisioning URI.
-
-[x] Regenerate the Laravel session after successful login and logout.
-
-[x] Protect both the application page and `POST /api/worklogs` with session authentication.
-
-[x] Use Laravel CSRF protection for state-changing browser requests.
-
-[x] Rate-limit failed login attempts.
-
-[x] Do not add a users table, registration, password recovery, OAuth, Google login, or Sanctum.
-
-## Verification
-
-[x] Add feature tests for guest rejection, successful TOTP login, invalid codes, logout, rate limiting, and authenticated worklog submission.
-
-[x] Verify relevant accessibility behavior and responsive layout.
-
-[x] Run the Vite production build.
-
-[x] Run formatting and the complete PHP test suite.
-
-[x] Stop after Phase 3 unless explicitly instructed to continue.
+- Direct API bypass cannot create a worklog on a parent issue.
 
 ---
 
-# Phase 4 — Google Chat Notification
+# Phase 3 — Active Sprint UI
 
-Goal: Notify a Google Chat space after Jira successfully creates a worklog.
+Goal: render a minimal Jira-like hierarchy optimized for work logging.
 
-[x] Add `GOOGLE_CHAT_WEBHOOK_URL` to `.env.example` without a real URL.
+- [x] Add sprint header with active sprint name/date range.
+- [x] Add loading state/skeleton.
+- [x] Add no-active-sprint state.
+- [x] Add no-subtasks state.
+- [x] Add safe Jira error state.
+- [x] Render parent issue groups/cards.
+- [x] Render nested relevant subtasks.
+- [x] Show compact status information.
+- [x] Ensure parent issues have no Log Work action.
+- [x] Make only subtasks selectable.
+- [x] Add manual refresh action.
+- [x] Ensure responsive desktop/mobile layout.
+- [x] Preserve TOTP session-expiry behavior.
 
-[x] Map the environment variable through `config/services.php`.
+Acceptance:
 
-[x] Implement `GoogleChatNotifier` using Laravel HTTP Client.
-
-[x] Send a concise message containing ticket, human-readable duration, and started date/time.
-
-[x] Invoke the notifier only after Jira succeeds.
-
-[x] Return `notificationSent: true` after successful delivery.
-
-[x] On missing configuration or delivery failure, log a safe warning and return `notificationSent: false` while keeping the worklog response successful.
-
-[x] Never retry by creating another Jira worklog.
-
-[x] Add mocked HTTP tests for notification success, missing configuration, timeout, rejection, and safe logging.
-
-[x] Test explicitly that Jira failure does not notify and notification failure does not change Jira success.
+- User can visually find their sprint subtasks without typing ticket keys.
 
 ---
 
-# Phase 5 — Docker
+# Phase 4 — Quick Duration Picker
 
-Goal: Produce a minimal reproducible image that serves Laravel and compiled Vue assets.
+Goal: log time with minimal keyboard usage.
 
-[x] Add a production-ready `Dockerfile`.
+Rules:
 
-[x] Add `.dockerignore`.
+- min 15m
+- max 7h
+- step 15m
 
-[x] Install PHP and JavaScript dependencies reproducibly.
+Presets:
 
-[x] Compile Vite assets during the image build without embedding runtime secrets.
+- 15m
+- 30m
+- 45m
+- 1h
+- 1h30m
+- 2h
+- 3h
+- 4h
+- 5h
+- 6h
+- 7h
 
-[x] Publish `phidinh/jira-worklog-bot:latest` and an immutable commit SHA tag on every push to `main` through GitHub Actions.
+Tasks:
 
-[x] Remove FrankenPHP's privileged-port capability for the non-root Render runtime.
+- [x] Implement reusable duration picker.
+- [x] Store selection internally as integer minutes.
+- [x] Implement `-15m` control.
+- [x] Implement `+15m` control.
+- [x] Enforce 15m minimum.
+- [x] Enforce 7h maximum.
+- [x] Implement preset buttons.
+- [x] Convert selected minutes into the existing worklog duration contract.
+- [x] Expand/show picker only for a selected subtask.
+- [x] Display selected subtask context clearly.
+- [x] Submit through the existing worklog application flow.
+- [x] Prevent duplicate submissions while pending.
+- [x] Show concise success feedback.
+- [x] Show safe Jira/worklog errors.
+- [x] Keep Google Chat notification behavior unchanged.
 
-[ ] Build and run the container locally.
+Acceptance:
 
-[ ] Verify `GET /health`, login, the Vue page, and authenticated `POST /api/worklogs`.
-
-[x] Run automated tests before deployment.
-
----
-
-# Phase 6 — Render
-
-Goal: Deploy the protected application and configure external integrations.
-
-[ ] Create a Render Web Service and connect the GitHub repository.
-
-[ ] Configure Docker deployment.
-
-[ ] Configure `APP_KEY`, secure production session settings, `WORKLOG_TOTP_SECRET`, Jira credentials, and `GOOGLE_CHAT_WEBHOOK_URL` as Render secrets.
-
-[ ] Deploy and verify the public health endpoint.
-
-[ ] Verify unauthenticated users cannot access the UI or worklog API.
-
-[ ] Verify login and the Vue production build.
-
-[ ] Verify Jira integration from Render.
-
-[ ] Verify Google Chat incoming-webhook delivery from Render.
-
----
-
-# Phase 7 — End-to-End Verification
-
-[ ] Verify normal daily usage with ticket and duration only.
-
-[ ] Verify explicit date and time input.
-
-[ ] Verify ticket normalization.
-
-[ ] Verify invalid ticket, duration, date, and time behavior.
-
-[ ] Verify login rejection, rate limiting, logout, session expiry, and protected API behavior.
-
-[ ] Verify Jira success with Google Chat notification success.
-
-[ ] Verify Jira success remains successful when Google Chat notification fails.
-
-[ ] Verify Jira failure does not send a Google Chat notification.
-
-[ ] Verify repeated clicks cannot accidentally create duplicate worklogs.
-
-[ ] Verify credentials and secrets are absent from the repository, browser bundle, logs, responses, and committed Docker configuration.
+- Typical log flow requires selecting a subtask, selecting a preset, and pressing Log.
 
 ---
 
-# Current Scope
+# Phase 5 — Today's Worklog Summary
 
-The agent must not implement the following unless explicitly requested:
+Goal: show progress against a standard 7-hour workday.
 
-```text
-database persistence
-Redis
-queues
-multi-user support
-registration or password recovery
-Jira OAuth
-Google Chat app or slash commands
-Google OAuth
-Vue Router
-Pinia
-UI framework
-dashboard or worklog history
-worklog editing, deletion, or undo
-comments/descriptions
-```
+- [ ] Add Jira read support for current user's worklogs for the current product-local day.
+- [ ] Calculate total logged minutes.
+- [ ] Return normalized `totalMinutes`/equivalent data.
+- [ ] Display `Today X / 7h` summary.
+- [ ] Add compact progress visualization if consistent with DESIGN.md.
+- [ ] Refresh total after successful quick worklog.
+- [ ] Allow total above 7h.
+- [ ] Display over-7h state as informational/warning only.
+- [ ] Avoid excessive Jira API requests.
+- [ ] Add tests around date/timezone boundaries.
+
+Acceptance:
+
+- Today's total updates after a successful worklog.
 
 ---
 
-# Current Milestone
+# Phase 6 — MVP2 Integration & Polish
 
-Current target:
+- [ ] Verify existing manual worklog fallback remains usable if retained.
+- [ ] Verify all write paths enforce subtask-only rule.
+- [ ] Verify Jira success triggers Google Chat notification.
+- [ ] Verify Google Chat failure does not turn a successful Jira worklog into a failure.
+- [ ] Verify unauthenticated calls never reach Jira/Google Chat.
+- [ ] Verify TOTP login/session expiry/logout.
+- [ ] Verify mobile UX.
+- [ ] Run Pint.
+- [ ] Run Composer validation.
+- [ ] Run complete Laravel tests.
+- [ ] Run Vite production build.
+- [ ] Build Docker image.
+- [ ] Run local production smoke test.
+- [ ] Deploy to Render.
+- [ ] Production E2E: active sprint load.
+- [ ] Production E2E: subtask quick worklog.
+- [ ] Production E2E: Google Chat notification.
+- [ ] Production E2E: today's total refresh.
+- [ ] Update architecture/design documentation for final implementation differences.
+- [ ] Tag MVP2 release when complete.
 
-```text
-Phase 3 — Vue UI and Personal Access
-```
+---
 
-Phase 3 is complete when:
+# Explicit Non-Goals
 
-```text
-obsolete Google Chat input code is removed
-        +
-the authenticated Vue UI works on mobile and desktop
-        +
-POST /api/worklogs is protected and used by the UI
-        +
-loading, validation, success, and error states work
-        +
-the Vite production build passes
-        +
-the complete PHP test suite passes
-```
+Do not implement in MVP2:
 
-Do not begin Google Chat notification, Docker, or Render work until Phase 3 is complete and the user explicitly requests the next phase.
+- worklogs on parent/non-subtask issues
+- create/edit Jira issues
+- transition Jira status
+- Jira comments
+- sprint/board administration
+- drag-and-drop board UI
+- multi-user support
+- database/Redis unless a new requirement explicitly demands it
+- edit/delete worklogs
+- offline mode
+
+# MVP2 Definition of Done
+
+TOTP login
+-> active sprint loads
+-> parent issues group current user's relevant subtasks
+-> only subtask is selectable
+-> choose duration with presets or +/-15m
+-> log work
+-> backend verifies target is a Jira subtask
+-> Jira worklog created
+-> Google Chat notification sent as secondary side effect
+-> today's total refreshes

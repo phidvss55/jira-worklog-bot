@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Application\Worklog\LogWorkCommand;
 use App\Application\Worklog\LogWorkHandler;
+use App\Application\Worklog\WorklogTargetNotSubtaskException;
 use App\Http\Requests\StoreWorklogRequest;
 use App\Services\Jira\JiraClientException;
 use App\Support\DurationParser;
@@ -31,6 +32,11 @@ final class WorklogController extends Controller
 
         try {
             $result = $handler->handle($command);
+        } catch (WorklogTargetNotSubtaskException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
         } catch (JiraClientException $exception) {
             return response()->json([
                 'success' => false,

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthenticationController;
+use App\Http\Controllers\SprintController;
 use App\Http\Controllers\WorklogController;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Route;
@@ -19,5 +20,6 @@ Route::middleware('worklog.auth')->group(function (): void {
     })->name('worklog');
 
     Route::post('/api/worklogs', WorklogController::class)->name('worklogs.store');
+    Route::get('/api/sprint', SprintController::class)->name('sprint.show');
     Route::post('/logout', [AuthenticationController::class, 'destroy'])->name('logout');
 });

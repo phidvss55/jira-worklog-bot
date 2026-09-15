@@ -178,6 +178,7 @@ final class AuthenticationTest extends TestCase
     public function test_authenticated_worklog_request_preserves_existing_behavior(): void
     {
         $jiraClient = Mockery::mock(JiraClient::class);
+        $jiraClient->shouldReceive('isSubtask')->once()->andReturn(true);
         $jiraClient->shouldReceive('logWork')->once();
         $this->app->instance(JiraClient::class, $jiraClient);
 

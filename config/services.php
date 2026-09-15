@@ -6,6 +6,7 @@ return [
         'base_url' => env('JIRA_BASE_URL'),
         'email' => env('JIRA_EMAIL'),
         'api_token' => env('JIRA_API_TOKEN'),
+        'board_id' => env('JIRA_BOARD_ID'),
         'timeout' => 10,
     ],
 
