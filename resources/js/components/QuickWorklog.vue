@@ -69,7 +69,7 @@ async function submit() {
 
 <template>
     <section class="quick-worklog" :aria-label="`Log work for ${subtask.key}`">
-        <DurationPicker v-model="minutes" :disabled="isSubmitting" />
+        <DurationPicker v-model="minutes" :disabled="isSubmitting" :estimate-minutes="subtask.estimateMinutes" />
         <button class="quick-log-button" type="button" :disabled="isSubmitting" @click="submit">
             <span v-if="isSubmitting" class="spinner" aria-hidden="true"></span>
             {{ isSubmitting ? 'Logging work…' : `Log ${formatDuration(minutes)}` }}

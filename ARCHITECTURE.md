@@ -90,7 +90,8 @@ Conceptual response:
 "key": "BKM4-1234",
 "summary": "Implement validation",
 "status": "In Progress",
-"issueType": "Sub-task"
+"issueType": "Sub-task",
+"estimateMinutes": 120
 }
 ]
 }

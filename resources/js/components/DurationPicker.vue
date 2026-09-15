@@ -17,6 +17,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    estimateMinutes: {
+        type: Number,
+        default: null,
+    },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -54,12 +58,12 @@ function setDuration(minutes) {
                 v-for="preset in durationPresets"
                 :key="preset"
                 type="button"
-                :class="{ selected: modelValue === preset }"
+                :class="{ selected: modelValue === preset, 'is-estimate': estimateMinutes === preset }"
                 :disabled="disabled"
                 :aria-pressed="modelValue === preset"
                 @click="setDuration(preset)"
             >
-                {{ formatDuration(preset) }}
+                {{ formatDuration(preset) }}<span v-if="estimateMinutes === preset" aria-hidden="true"> ★</span>
             </button>
         </div>
     </div>

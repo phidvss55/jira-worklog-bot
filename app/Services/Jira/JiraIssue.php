@@ -12,6 +12,7 @@ final readonly class JiraIssue
         public bool $subtask,
         public ?string $assigneeAccountId,
         public ?string $parentKey,
+        public ?int $estimateMinutes,
     ) {}
 
     public function isSubtask(): bool

@@ -181,6 +181,7 @@ input {
     align-items: start;
     justify-content: space-between;
     gap: 18px;
+    flex-direction: column !important;
 }
 
 .issue-group-header {
@@ -198,6 +199,14 @@ input {
     font-size: 12px;
     font-weight: 750;
     letter-spacing: 0.04em;
+}
+
+.subtask-estimate {
+    display: inline-block;
+    margin-top: 5px;
+    color: #77859a;
+    font-size: 12px;
+    font-weight: 650;
 }
 
 .issue-key {
@@ -293,6 +302,7 @@ input {
     padding: 16px 18px 18px 28px;
     border-top: 1px solid #dfe7f7;
     background: #f8faff;
+    width: 100%;
 }
 
 .duration-picker {
@@ -320,7 +330,7 @@ input {
 }
 
 .duration-presets {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
 }
 
 .duration-adjustments button,
@@ -340,6 +350,12 @@ input {
     border-color: #3d5bd8;
     color: #fff;
     background: #3d5bd8;
+}
+
+.duration-presets button.is-estimate:not(.selected) {
+    border-color: #af9ad6;
+    color: #5e4b86;
+    background: #f5f1fc;
 }
 
 .duration-adjustments button:hover:not(:disabled),
@@ -504,7 +520,7 @@ input {
     cursor: pointer;
 }
 
-.manual-worklog > p {
+.manual-worklog>p {
     margin: 0 18px 16px;
     color: #738097;
     font-size: 13px;
@@ -541,7 +557,7 @@ input {
     margin-bottom: 30px;
 }
 
-.card-header > div:nth-child(2) {
+.card-header>div:nth-child(2) {
     min-width: 0;
 }
 
@@ -818,6 +834,8 @@ input[aria-invalid="true"] {
 
     .subtask-item {
         padding: 0;
+        display: flex;
+        flex-direction: column !important;
     }
 
     .subtask-select,
@@ -850,6 +868,7 @@ input[aria-invalid="true"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {

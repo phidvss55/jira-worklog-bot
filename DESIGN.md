@@ -44,10 +44,13 @@ Each subtask displays:
 - summary
 - status
 - optional today's logged time if available without excessive Jira requests
+- original estimate when Jira provides one
 
 Subtasks are the only selectable worklog targets.
 
 Selecting a subtask opens/expands the quick-worklog controls inline where practical. Prefer inline expansion over a heavy modal.
+
+The quick-worklog section sits directly beneath the selected subtask. If its original estimate matches a duration preset, mark that preset subtly. Estimates are informational and never block a longer worklog.
 
 ## Quick Duration Picker
 

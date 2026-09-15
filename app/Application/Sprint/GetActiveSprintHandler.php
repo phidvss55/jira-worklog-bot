@@ -58,7 +58,7 @@ final readonly class GetActiveSprintHandler
         );
     }
 
-    /** @return array{key: string, summary: string, status: string, issueType: string, subtasks: list<array{key: string, summary: string, status: string, issueType: string, loggable: true}>} */
+    /** @return array{key: string, summary: string, status: string, issueType: string, subtasks: list<array{key: string, summary: string, status: string, issueType: string, loggable: true, estimateMinutes: ?int}>} */
     private function parentView(JiraIssue $issue): array
     {
         return [
@@ -70,7 +70,7 @@ final readonly class GetActiveSprintHandler
         ];
     }
 
-    /** @return array{key: string, summary: string, status: string, issueType: string, loggable: true} */
+    /** @return array{key: string, summary: string, status: string, issueType: string, loggable: true, estimateMinutes: ?int} */
     private function subtaskView(JiraIssue $issue): array
     {
         return [
@@ -79,6 +79,7 @@ final readonly class GetActiveSprintHandler
             'status' => $issue->status,
             'issueType' => $issue->issueType,
             'loggable' => true,
+            'estimateMinutes' => $issue->estimateMinutes,
         ];
     }
 }

@@ -138,7 +138,7 @@ final readonly class JiraCloudClient implements JiraClient
             $response = $this->get('/rest/agile/1.0/sprint/'.$sprintId.'/issue', [
                 'startAt' => $startAt,
                 'maxResults' => 100,
-                'fields' => 'summary,status,issuetype,assignee,parent',
+                'fields' => 'summary,status,issuetype,assignee,parent,timetracking',
             ]);
             $page = $response->json('issues', []);
 
@@ -295,6 +295,7 @@ final readonly class JiraCloudClient implements JiraClient
         $assigneeAccountId = is_array($fields) ? data_get($fields, 'assignee.accountId') : null;
         $parentKey = is_array($fields) ? data_get($fields, 'parent.key') : null;
         $subtask = is_array($fields) && data_get($fields, 'issuetype.subtask') === true;
+        $originalEstimateSeconds = is_array($fields) ? data_get($fields, 'timetracking.originalEstimateSeconds') : null;
 
         return new JiraIssue(
             key: $key,
@@ -304,6 +305,9 @@ final readonly class JiraCloudClient implements JiraClient
             subtask: $subtask,
             assigneeAccountId: is_string($assigneeAccountId) ? $assigneeAccountId : null,
             parentKey: is_string($parentKey) ? $parentKey : null,
+            estimateMinutes: is_int($originalEstimateSeconds) && $originalEstimateSeconds >= 0
+                ? intdiv($originalEstimateSeconds, 60)
+                : null,
         );
     }
 

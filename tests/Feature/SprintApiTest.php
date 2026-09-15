@@ -50,6 +50,7 @@ final class SprintApiTest extends TestCase
                         'status' => 'In Progress',
                         'issueType' => 'Sub-task',
                         'loggable' => true,
+                        'estimateMinutes' => 120,
                     ]],
                 ]],
             ]);
@@ -71,6 +72,38 @@ final class SprintApiTest extends TestCase
         $this->assertSame('BKM4-1234', $parent['subtasks'][0]['key']);
         $this->assertTrue($parent['subtasks'][0]['loggable']);
         $this->assertCount(1, $parent['subtasks']);
+    }
+
+    public function test_subtask_without_an_original_estimate_returns_null(): void
+    {
+        $responses = $this->activeSprintResponses();
+        $subtask = $this->mySubtaskIssue();
+        $subtask['fields']['timetracking'] = [];
+        $responses['jira.example.test/rest/agile/1.0/sprint/24/issue*'] = Http::response([
+            'total' => 2,
+            'issues' => [$this->parentIssue(), $subtask],
+        ]);
+        Http::fake($responses);
+
+        $this->authenticated()->getJson('/api/sprint')
+            ->assertOk()
+            ->assertJsonPath('issues.0.subtasks.0.estimateMinutes', null);
+    }
+
+    public function test_fractional_hour_original_estimate_is_normalized_to_minutes(): void
+    {
+        $responses = $this->activeSprintResponses();
+        $subtask = $this->mySubtaskIssue();
+        $subtask['fields']['timetracking'] = ['originalEstimateSeconds' => 5400];
+        $responses['jira.example.test/rest/agile/1.0/sprint/24/issue*'] = Http::response([
+            'total' => 2,
+            'issues' => [$this->parentIssue(), $subtask],
+        ]);
+        Http::fake($responses);
+
+        $this->authenticated()->getJson('/api/sprint')
+            ->assertOk()
+            ->assertJsonPath('issues.0.subtasks.0.estimateMinutes', 90);
     }
 
     public function test_no_active_sprint_returns_an_empty_normalized_view(): void
@@ -204,6 +237,7 @@ final class SprintApiTest extends TestCase
                 'issuetype' => ['name' => 'Sub-task', 'subtask' => true],
                 'assignee' => ['accountId' => 'account-me'],
                 'parent' => ['key' => 'BKM4-1201'],
+                'timetracking' => ['originalEstimateSeconds' => 7200],
             ],
         ];
     }

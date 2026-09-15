@@ -1,5 +1,6 @@
 <script setup>
 import { formatStatus, statusClass } from '../support/status';
+import { formatDuration } from '../support/duration';
 import QuickWorklog from './QuickWorklog.vue';
 
 defineProps({
@@ -28,6 +29,7 @@ defineEmits(['select', 'close']);
             <div class="issue-copy">
                 <span class="issue-key">{{ subtask.key }}</span>
                 <p>{{ subtask.summary }}</p>
+                <span v-if="Number.isInteger(subtask.estimateMinutes)" class="subtask-estimate">Estimate {{ formatDuration(subtask.estimateMinutes) }}</span>
             </div>
             <span class="status-pill" :class="statusClass(subtask.status)">{{ formatStatus(subtask.status) }}</span>
         </button>
@@ -35,6 +37,7 @@ defineEmits(['select', 'close']);
             <div class="issue-copy">
                 <span class="issue-key">{{ subtask.key }}</span>
                 <p>{{ subtask.summary }}</p>
+                <span v-if="Number.isInteger(subtask.estimateMinutes)" class="subtask-estimate">Estimate {{ formatDuration(subtask.estimateMinutes) }}</span>
             </div>
             <span class="status-pill" :class="statusClass(subtask.status)">{{ formatStatus(subtask.status) }}</span>
         </div>
